@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
@@ -30,8 +29,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Public
@@ -287,41 +286,85 @@ private fun scrapeMinVersion(doc: Document): String? {
 
 // --- APK DIRECT DOWNLOAD LINK SCRAPER ---
 /**
- * Given an APKMirror version page URL, scrapes the direct APK download link.
- * The flow is: version page → download page → actual APK URL.
+ * Scrapes the direct APK download URL from an APKMirror version page.
+ *
+ * APKMirror flow:
+ *   1. Version page  → find a variant row with an APK (not APKM/XAPK) download button
+ *   2. Download interstitial page → find the ?key= confirmation link
+ *   3. Follow that link (with redirect) → final CDN URL
  */
 suspend fun scrapeDirectDownloadUrl(versionPageUrl: String): String? = withContext(Dispatchers.IO) {
     try {
-        // Step 1: Get download page link from version page
+        // Step 1: Load the version page and find an APK download button href
         val versionDoc = Jsoup.connect(versionPageUrl)
             .userAgent(browserUserAgent)
-            .timeout(20000)
+            .referrer("https://www.apkmirror.com/")
+            .timeout(20_000)
             .get()
 
-        // Find the first "Download APK" link
-        val downloadPageLink = versionDoc.select("a[href*=download]")
-            .firstOrNull { el ->
-                val href = el.attr("href")
-                val text = el.text()
-                (text.contains("APK", ignoreCase = true) || href.contains("download")) &&
-                        !href.contains("http") // relative link
-            }?.attr("href") ?: return@withContext null
-
-        val downloadPageUrl = "https://www.apkmirror.com$downloadPageLink"
-
-        // Step 2: Get actual APK download URL from the download interstitial page
-        val downloadDoc = Jsoup.connect(downloadPageUrl)
-            .userAgent(browserUserAgent)
-            .timeout(20000)
-            .get()
-
-        // Look for the direct download link
-        val directLink = downloadDoc.select("a[href*=.apk]").firstOrNull()?.attr("href")
-            ?: downloadDoc.select("a[rel=nofollow][href]")
-                .firstOrNull { it.attr("href").contains("apkmirror.com") }
+        // Look for variant rows that explicitly say "APK" (not APKM/XAPK/bundle)
+        val downloadPageHref = versionDoc
+            .select("div.table-row.headerFont")
+            .firstOrNull { row ->
+                val typeCell = row.select("div.table-cell span.apkm-badge, div.table-cell").text()
+                typeCell.contains("APK", ignoreCase = true) &&
+                        !typeCell.contains("APKM", ignoreCase = true) &&
+                        !typeCell.contains("XAPK", ignoreCase = true)
+            }
+            ?.select("a.accent_color")
+            ?.firstOrNull()
+            ?.attr("href")
+            // Fallback: any /wp-content/…/download/ relative link
+            ?: versionDoc.select("a[href*='/apk/'][href*='/download-']")
+                .firstOrNull { !it.attr("href").contains("APKM", ignoreCase = true) }
                 ?.attr("href")
 
-        directLink
+        if (downloadPageHref == null) {
+            Log.e("BadlockDownload", "No APK download link found on version page: $versionPageUrl")
+            return@withContext null
+        }
+
+        val downloadInterstitialUrl = if (downloadPageHref.startsWith("http")) downloadPageHref
+        else "https://www.apkmirror.com$downloadPageHref"
+
+        // Step 2: Load the download interstitial page and find the ?key= confirmation link
+        val interstitialDoc = Jsoup.connect(downloadInterstitialUrl)
+            .userAgent(browserUserAgent)
+            .referrer(versionPageUrl)
+            .timeout(20_000)
+            .get()
+
+        val confirmHref = interstitialDoc
+            .select("a[href*='?key='], a.downloadButton[href]")
+            .firstOrNull { it.attr("href").contains("key=") || it.attr("href").contains("download") }
+            ?.attr("href")
+
+        if (confirmHref == null) {
+            Log.e("BadlockDownload", "No confirmation key link found on interstitial: $downloadInterstitialUrl")
+            return@withContext null
+        }
+
+        val confirmUrl = if (confirmHref.startsWith("http")) confirmHref
+        else "https://www.apkmirror.com$confirmHref"
+
+        // Step 3: Follow the confirmation URL — APKMirror redirects to the real CDN APK
+        val connection = URL(confirmUrl).openConnection() as HttpURLConnection
+        connection.setRequestProperty("User-Agent", browserUserAgent)
+        connection.setRequestProperty("Referer", downloadInterstitialUrl)
+        connection.instanceFollowRedirects = true
+        connection.connectTimeout = 20_000
+        connection.readTimeout = 20_000
+        connection.connect()
+
+        val finalUrl = connection.url.toString()
+        connection.disconnect()
+
+        if (finalUrl.endsWith(".apk", ignoreCase = true) || finalUrl.contains(".apk?", ignoreCase = true)) {
+            finalUrl
+        } else {
+            Log.e("BadlockDownload", "Final URL doesn't look like an APK: $finalUrl")
+            null
+        }
     } catch (e: Exception) {
         Log.e("BadlockDownload", "Failed to scrape direct URL from $versionPageUrl", e)
         null
@@ -337,7 +380,6 @@ suspend fun downloadApk(
     try {
         val versionUrl = module.latestVersionUrl ?: return@withContext null
 
-        // Scrape the direct APK download URL
         val apkUrl = scrapeDirectDownloadUrl(versionUrl) ?: run {
             Log.e("BadlockDownload", "Could not get direct download URL for ${module.name}")
             return@withContext null
@@ -349,8 +391,9 @@ suspend fun downloadApk(
 
         val connection = URL(apkUrl).openConnection() as HttpURLConnection
         connection.setRequestProperty("User-Agent", browserUserAgent)
-        connection.connectTimeout = 30000
-        connection.readTimeout = 60000
+        connection.setRequestProperty("Referer", "https://www.apkmirror.com/")
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 60_000
         connection.connect()
 
         val fileSize = connection.contentLengthLong
@@ -452,7 +495,7 @@ fun isUpdateAvailable(moduleName: String, installedVersion: String?, latestVersi
     return false
 }
 
-// --- LAUNCH INTENT HELPERS (unchanged from original) ---
+// --- LAUNCH INTENT HELPERS ---
 fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: String): Intent? {
     return when (packageName) {
         "com.samsung.android.app.clockface" -> Intent().apply {
@@ -587,12 +630,13 @@ suspend fun loadData(context: Context, cacheManager: CacheManager): ModuleState 
                                 installedVersion = pkgInfo.versionName
                                 launchIntent = getBestLaunchIntent(context, moduleInfo.packageName, moduleInfo.name)
                             } catch (e: Exception) { Log.e("BadlockLoad", "Error getting package info for ${moduleInfo.packageName}", e) }
-                            versionResult = try {
-                                fetchLatestVersionFromRssFeed(moduleInfo.apkMirrorMainPage)
-                            } catch (e: Exception) {
-                                Log.w("BadlockFetch", "RSS fetch failed for ${moduleInfo.name}, trying HTML fallback.", e)
-                                fetchLatestVersionFromHtmlFallback(moduleInfo.apkMirrorMainPage)
-                            }
+                        }
+                        // Always fetch latest version so Install button can also download in-app
+                        versionResult = try {
+                            fetchLatestVersionFromRssFeed(moduleInfo.apkMirrorMainPage)
+                        } catch (e: Exception) {
+                            Log.w("BadlockFetch", "RSS fetch failed for ${moduleInfo.name}, trying HTML fallback.", e)
+                            fetchLatestVersionFromHtmlFallback(moduleInfo.apkMirrorMainPage)
                         }
                         val resourceName = moduleInfo.name.lowercase().replace(" ", "_").replace("+", "")
                         val iconResId = context.resources.getIdentifier(resourceName, "drawable", context.packageName).let { if (it == 0) null else it }
@@ -720,7 +764,6 @@ class DownloadQueueManager(
     }
 
     fun enqueueAll(modules: List<InstalledModule>) {
-        // Mark all as queued first
         modules.forEach { module ->
             downloadStates[module.packageName] = DownloadState(
                 packageName = module.packageName,
@@ -728,7 +771,6 @@ class DownloadQueueManager(
                 status = DownloadStatus.QUEUED
             )
         }
-        // Process serially
         coroutineScope.launch {
             for (module in modules) {
                 processDownload(module)
@@ -755,14 +797,12 @@ class DownloadQueueManager(
         if (apkFile != null) {
             downloadStates[module.packageName] = downloadStates[module.packageName]!!.copy(status = DownloadStatus.INSTALLING, progress = 1f)
             installApk(context, apkFile)
-            // Keep as INSTALLING until user finishes the system installer
-            // Mark done after a short delay to give the installer time to show
             kotlinx.coroutines.delay(3000)
             downloadStates[module.packageName] = downloadStates[module.packageName]!!.copy(status = DownloadStatus.DONE)
         } else {
             downloadStates[module.packageName] = downloadStates[module.packageName]!!.copy(
                 status = DownloadStatus.ERROR,
-                errorMessage = "Download failed. Tap to try via browser."
+                errorMessage = "Download failed. Tap to open in browser instead."
             )
         }
     }
@@ -812,7 +852,14 @@ fun MainScreen(cacheManager: CacheManager) {
     }
     val onWebsiteClick = remember<(String) -> Unit> { { url -> openUrl(context, url) } }
     val onUpdateClick = remember<(InstalledModule) -> Unit> { { module -> downloadQueueManager.enqueue(module) } }
-    val onInstallClick = remember<(InstalledModule) -> Unit> { { module -> openUrl(context, module.apkMirrorMainPage) } }
+    // Install now uses the download queue if we have a version URL, otherwise falls back to browser
+    val onInstallClick = remember<(InstalledModule) -> Unit> { { module ->
+        if (module.latestVersionUrl != null) {
+            downloadQueueManager.enqueue(module)
+        } else {
+            openUrl(context, module.apkMirrorMainPage)
+        }
+    }}
     val onAppInfoClick = remember<(String) -> Unit> { { packageName -> openAppInfo(context, packageName) } }
 
     Scaffold(
@@ -873,6 +920,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                 } else {
                                     ModuleList(
                                         modules = modulesToShow,
+                                        downloadStates = downloadStates,
                                         showEmptyMessage = false,
                                         onModuleClick = onModuleClick,
                                         onWebsiteClick = onWebsiteClick,
@@ -939,7 +987,7 @@ fun MainScreen(cacheManager: CacheManager) {
     }
 }
 
-// --- UPDATES PAGE (with Update All button) ---
+// --- UPDATES PAGE ---
 @Composable
 fun UpdatesPage(
     modules: List<InstalledModule>,
@@ -973,7 +1021,6 @@ fun UpdatesPage(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Update All header button
             item {
                 Button(
                     onClick = onUpdateAllClick,
@@ -1018,7 +1065,7 @@ fun UpdatesPage(
     }
 }
 
-// --- UPDATE MODULE CARD (shows download progress) ---
+// --- UPDATE MODULE CARD ---
 @Composable
 fun UpdateModuleCard(
     module: InstalledModule,
@@ -1056,14 +1103,11 @@ fun UpdateModuleCard(
                         Text("Requires: ${module.minAndroidVersion}", color = TextSecondary, fontSize = 12.sp)
                     }
                 }
-                // Action button area
                 when (downloadState?.status) {
                     DownloadStatus.QUEUED -> {
                         Text("Queued", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
                     }
-                    DownloadStatus.DOWNLOADING -> {
-                        // Progress shown in the LinearProgressIndicator below
-                    }
+                    DownloadStatus.DOWNLOADING -> { /* progress bar below */ }
                     DownloadStatus.INSTALLING -> {
                         Text("Installing...", color = GreenAccent, fontSize = 12.sp, modifier = Modifier.padding(end = 8.dp))
                     }
@@ -1096,7 +1140,6 @@ fun UpdateModuleCard(
                 }
             }
 
-            // Progress bar for downloading
             if (downloadState?.status == DownloadStatus.DOWNLOADING) {
                 LinearProgressIndicator(
                     progress = { downloadState.progress },
@@ -1120,6 +1163,7 @@ fun UpdateModuleCard(
 @Composable
 fun ModuleList(
     modules: List<InstalledModule>,
+    downloadStates: Map<String, DownloadState>,
     showEmptyMessage: Boolean = false,
     onModuleClick: (InstalledModule) -> Unit,
     onWebsiteClick: (String) -> Unit,
@@ -1147,6 +1191,7 @@ fun ModuleList(
             items(items = modules, key = { it.packageName }) { module ->
                 ModuleCard(
                     module = module,
+                    downloadState = downloadStates[module.packageName],
                     onModuleClick = { onModuleClick(module) },
                     onWebsiteClick = { onWebsiteClick(module.apkMirrorMainPage) },
                     onUpdateClick = { onUpdateClick(module) },
@@ -1162,6 +1207,7 @@ fun ModuleList(
 @Composable
 fun ModuleCard(
     module: InstalledModule,
+    downloadState: DownloadState?,
     onModuleClick: () -> Unit,
     onWebsiteClick: () -> Unit,
     onUpdateClick: () -> Unit,
@@ -1173,52 +1219,95 @@ fun ModuleCard(
         colors = CardDefaults.cardColors(containerColor = DarkSurface.copy(alpha = 0.8f)),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onModuleClick)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(DarkBackground),
-                contentAlignment = Alignment.Center
+        Column {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Image(
-                    painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.drawable.ic_launcher_foreground),
-                    contentDescription = "${module.name} icon",
-                    modifier = Modifier.size(32.dp)
+                Box(
+                    modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(DarkBackground),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.drawable.ic_launcher_foreground),
+                        contentDescription = "${module.name} icon",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(module.name, fontWeight = FontWeight.SemiBold, color = TextPrimary, fontSize = 16.sp)
+                    Spacer(Modifier.height(4.dp))
+                    VersionInfo(module)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (module.isInstalled) {
+                        if (module.isUpdateAvailable) {
+                            when (downloadState?.status) {
+                                DownloadStatus.QUEUED -> Text("Queued", color = TextSecondary, fontSize = 12.sp)
+                                DownloadStatus.INSTALLING -> Text("Installing...", color = GreenAccent, fontSize = 12.sp)
+                                DownloadStatus.DONE -> Icon(Icons.Default.CheckCircle, contentDescription = "Done", tint = GreenAccent, modifier = Modifier.size(24.dp))
+                                DownloadStatus.ERROR -> Button(
+                                    onClick = onUpdateClick,
+                                    colors = ButtonDefaults.buttonColors(containerColor = UpdateYellow, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp)
+                                ) { Text("Retry", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                                else -> Button(
+                                    onClick = onUpdateClick,
+                                    colors = ButtonDefaults.buttonColors(containerColor = UpdateYellow, contentColor = Color.Black),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp)
+                                ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                            }
+                        }
+                    } else {
+                        // Not installed — show download progress or Install button
+                        when (downloadState?.status) {
+                            DownloadStatus.QUEUED -> Text("Queued", color = TextSecondary, fontSize = 12.sp)
+                            DownloadStatus.DOWNLOADING -> { /* progress bar below */ }
+                            DownloadStatus.INSTALLING -> Text("Installing...", color = GreenAccent, fontSize = 12.sp)
+                            DownloadStatus.DONE -> Icon(Icons.Default.CheckCircle, contentDescription = "Done", tint = GreenAccent, modifier = Modifier.size(24.dp))
+                            DownloadStatus.ERROR -> Button(
+                                onClick = onInstallClick,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f), contentColor = Color.White),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp)
+                            ) { Text("Retry", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                            else -> Button(
+                                onClick = onInstallClick,
+                                colors = ButtonDefaults.buttonColors(containerColor = GreenAccent, contentColor = Color.Black),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp)
+                            ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                        }
+                    }
+                    IconButton(onClick = onWebsiteClick) {
+                        Icon(Icons.Default.Public, contentDescription = "Go to Website", tint = TextSecondary)
+                    }
+                    if (module.isInstalled) {
+                        IconButton(onClick = onAppInfoClick) {
+                            Icon(Icons.Default.Info, contentDescription = "App Info", tint = TextSecondary)
+                        }
+                    }
+                }
+            }
+
+            // Download progress bar (shown for both install and update)
+            if (downloadState?.status == DownloadStatus.DOWNLOADING) {
+                LinearProgressIndicator(
+                    progress = { downloadState.progress },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
+                    color = if (module.isInstalled) PrimaryAccent else GreenAccent,
+                    trackColor = DarkBackground
                 )
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(module.name, fontWeight = FontWeight.SemiBold, color = TextPrimary, fontSize = 16.sp)
-                Spacer(Modifier.height(4.dp))
-                VersionInfo(module)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (module.isInstalled) {
-                    if (module.isUpdateAvailable) {
-                        Button(
-                            onClick = onUpdateClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = UpdateYellow, contentColor = Color.Black),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp)
-                        ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
-                    }
-                } else {
-                    Button(
-                        onClick = onInstallClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenAccent, contentColor = Color.Black),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
-                }
-                IconButton(onClick = onWebsiteClick) {
-                    Icon(Icons.Default.Public, contentDescription = "Go to Website", tint = TextSecondary)
-                }
-                if (module.isInstalled) {
-                    IconButton(onClick = onAppInfoClick) {
-                        Icon(Icons.Default.Info, contentDescription = "App Info", tint = TextSecondary)
-                    }
-                }
+            } else if (downloadState?.status == DownloadStatus.ERROR) {
+                Text(
+                    text = downloadState.errorMessage ?: "Download failed.",
+                    color = Color.Red.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)
+                )
             }
         }
     }
