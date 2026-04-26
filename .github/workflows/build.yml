@@ -74,7 +74,6 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         run: |
-          # Locate build tools from the Android SDK
           BUILD_TOOLS_DIR=$(ls -d "$ANDROID_SDK_ROOT/build-tools/"* | sort -V | tail -1)
           ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
           APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
@@ -131,44 +130,24 @@ jobs:
             echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Download release APK artifact
+        uses: actions/download-artifact@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
+          name: badlock-release-${{ github.sha }}
+          path: apk/release
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Download debug APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: badlock-debug-${{ github.sha }}
+          path: apk/debug
 
-      - name: Build release APK
-        run: ./gradlew assembleRelease --stacktrace
-
-      - name: Sign release APK
-        if: env.KEYSTORE_BASE64 != ''
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+      - name: Rename APKs with version
         run: |
-          # Locate build tools from the Android SDK
-          BUILD_TOOLS_DIR=$(ls -d "$ANDROID_SDK_ROOT/build-tools/"* | sort -V | tail -1)
-          ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
-          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
-
-          echo "$KEYSTORE_BASE64" | base64 --decode > keystore.jks
-          "$ZIPALIGN" -v 4 \
-            app/build/outputs/apk/release/app-release-unsigned.apk \
-            app/build/outputs/apk/release/app-release-aligned.apk
-          "$APKSIGNER" sign \
-            --ks keystore.jks \
-            --ks-key-alias "$KEY_ALIAS" \
-            --ks-pass "pass:$STORE_PASSWORD" \
-            --key-pass "pass:$KEY_PASSWORD" \
-            --out app/build/outputs/apk/release/app-release-signed.apk \
-            app/build/outputs/apk/release/app-release-aligned.apk
-          rm keystore.jks
+          TAG="${{ steps.tag.outputs.name }}"
+          mv apk/release/app-release-signed.apk   apk/release/badlock-${TAG}.apk
+          mv apk/release/app-release-unsigned.apk apk/release/badlock-${TAG}-unsigned.apk
+          mv apk/debug/app-debug.apk              apk/debug/badlock-${TAG}-debug.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -179,6 +158,6 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            app/build/outputs/apk/release/app-release-signed.apk
-            app/build/outputs/apk/release/app-release-unsigned.apk
-            app/build/outputs/apk/debug/app-debug.apk
+            apk/release/badlock-${{ steps.tag.outputs.name }}.apk
+            apk/release/badlock-${{ steps.tag.outputs.name }}-unsigned.apk
+            apk/debug/badlock-${{ steps.tag.outputs.name }}-debug.apk
