@@ -1098,7 +1098,7 @@ fun UpdateModuleCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.drawable.ic_launcher_foreground),
+                        painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.mipmap.ic_launcher),
                         contentDescription = "${module.name} icon",
                         modifier = Modifier.size(32.dp)
                     )
@@ -1238,7 +1238,7 @@ fun ModuleCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.drawable.ic_launcher_foreground),
+                        painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.mipmap.ic_launcher),
                         contentDescription = "${module.name} icon",
                         modifier = Modifier.size(32.dp)
                     )
