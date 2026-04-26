@@ -82,6 +82,7 @@ val DarkSurface = Color(0xFF1C1E28)
 val PrimaryAccent = Color(0xFF8A2BE2)
 val GreenAccent = Color(0xFF00FFA3)
 val UpdateYellow = Color(0xFFFFD600)
+val InstallBlue = Color(0xFF2196F3)
 val TextPrimary = Color.White.copy(alpha = 0.9f)
 val TextSecondary = Color.White.copy(alpha = 0.7f)
 
@@ -1284,7 +1285,7 @@ fun ModuleCard(
                             ) { Text("Retry", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
                             else -> Button(
                                 onClick = onInstallClick,
-                                colors = ButtonDefaults.buttonColors(containerColor = GreenAccent, contentColor = Color.Black),
+                                colors = ButtonDefaults.buttonColors(containerColor = InstallBlue, contentColor = Color.White),
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(horizontal = 12.dp)
                             ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
@@ -1306,7 +1307,7 @@ fun ModuleCard(
                 LinearProgressIndicator(
                     progress = { downloadState.progress },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp),
-                    color = if (module.isInstalled) PrimaryAccent else GreenAccent,
+                    color = if (module.isInstalled) PrimaryAccent else InstallBlue,
                     trackColor = DarkBackground
                 )
             } else if (downloadState?.status == DownloadStatus.ERROR) {
