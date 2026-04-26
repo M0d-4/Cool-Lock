@@ -54,10 +54,43 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Remove duplicate webp launcher icons
+      - name: Remove duplicate webp launcher icons and fix adaptive icon XMLs
         run: |
           find app/src/main/res -name "ic_launcher.webp" -delete
           find app/src/main/res -name "ic_launcher_round.webp" -delete
+          # Find the user's PNG icon name (first png in drawable folder)
+          ICON=$(find app/src/main/res/drawable -name "*.png" | head -1 | xargs basename | sed 's/\.png//')
+          if [ -z "$ICON" ]; then ICON="ic_launcher"; fi
+          echo "Using icon: $ICON"
+          # Rewrite both adaptive icon XMLs to point directly to the PNG
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << XMLEOF
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/${ICON}"/>
+    <foreground android:drawable="@drawable/${ICON}"/>
+</adaptive-icon>
+XMLEOF
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml << XMLEOF
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/${ICON}"/>
+    <foreground android:drawable="@drawable/${ICON}"/>
+</adaptive-icon>
+XMLEOF
+          # Write a fallback solid black background in case ic_launcher_background.xml was deleted
+          cat > app/src/main/res/drawable/ic_launcher_background.xml << XMLEOF
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#000000"/>
+</shape>
+XMLEOF
+          # Write a fallback foreground pointing to the PNG in case ic_launcher_foreground.xml was deleted
+          cat > app/src/main/res/drawable/ic_launcher_foreground.xml << XMLEOF
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/${ICON}"/>
+</layer-list>
+XMLEOF
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
