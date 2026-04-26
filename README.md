@@ -1,4 +1,4 @@
-#Badlock
+#Cool-lock
 
 
 Reimagining the Good Lock experience.
