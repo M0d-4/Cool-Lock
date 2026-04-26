@@ -865,7 +865,7 @@ fun MainScreen(cacheManager: CacheManager) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Badlock", fontWeight = FontWeight.Bold, color = TextPrimary) },
+                title = { Text("Cool-Lock", fontWeight = FontWeight.Bold, color = TextPrimary) },
                 actions = {
                     IconButton(onClick = { refreshData(force = true) }, enabled = moduleState != ModuleState.Loading) {
                         Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondary)
@@ -939,45 +939,53 @@ fun MainScreen(cacheManager: CacheManager) {
                             )
                         }
 
-                        TabRow(
-                            selectedTabIndex = pagerState.currentPage,
-                            containerColor = DarkBackground,
-                            indicator = {},
-                            divider = {}
+                        // Pill-style nav bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(DarkSurface)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
                             tabs.forEachIndexed { index, title ->
                                 val isSelected = pagerState.currentPage == index
-                                val tabColor by animateColorAsState(
-                                    targetValue = if (isSelected) DarkSurface else Color.Transparent,
-                                    animationSpec = tween(durationMillis = 300), label = "tab_color"
+                                val pillColor by animateColorAsState(
+                                    targetValue = if (isSelected) PrimaryAccent.copy(alpha = 0.18f) else Color.Transparent,
+                                    animationSpec = tween(durationMillis = 250), label = "pill_color"
                                 )
-                                Tab(
-                                    selected = isSelected,
-                                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
+                                val contentColor = if (isSelected) PrimaryAccent else TextSecondary
+                                val icon = when (title) {
+                                    "Updates" -> Icons.Default.SystemUpdate
+                                    "Make up" -> Icons.Default.Palette
+                                    else -> Icons.Default.Style
+                                }
+                                Box(
                                     modifier = Modifier
-                                        .padding(vertical = 8.dp, horizontal = 12.dp)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(tabColor),
-                                    text = {
+                                        .weight(1f)
+                                        .padding(horizontal = 4.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(pillColor)
+                                        .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         if (title == "Updates" && updatableModules.isNotEmpty()) {
                                             BadgedBox(badge = { Badge(containerColor = PrimaryAccent) { Text("${updatableModules.size}") } }) {
-                                                Text(title, fontWeight = FontWeight.SemiBold)
+                                                Icon(icon, contentDescription = title, tint = contentColor, modifier = Modifier.size(24.dp))
                                             }
                                         } else {
-                                            Text(title, fontWeight = FontWeight.SemiBold)
+                                            Icon(icon, contentDescription = title, tint = contentColor, modifier = Modifier.size(24.dp))
                                         }
-                                    },
-                                    icon = {
-                                        val icon = when (title) {
-                                            "Updates" -> Icons.Default.SystemUpdate
-                                            "Make up" -> Icons.Default.Palette
-                                            else -> Icons.Default.Style
-                                        }
-                                        Icon(icon, contentDescription = title)
-                                    },
-                                    selectedContentColor = PrimaryAccent,
-                                    unselectedContentColor = TextSecondary
-                                )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = title,
+                                            color = contentColor,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
