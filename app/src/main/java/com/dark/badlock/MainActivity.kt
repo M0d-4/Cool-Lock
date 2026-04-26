@@ -848,8 +848,7 @@ fun MainScreen(cacheManager: CacheManager) {
                         Box(modifier = Modifier.weight(1f)) {
                             HorizontalPager(
                                 state = pagerState,
-                                modifier = Modifier.fillMaxSize(),
-                                beyondBoundsPageCount = 1
+                                modifier = Modifier.fillMaxSize()
                             ) { page ->
                                 val pageTitle = tabs[page]
                                 val modulesToShow = when (pageTitle) {
