@@ -91,14 +91,6 @@ val InstallBlue = Color(0xFF2196F3)
 val TextPrimary = Color.White.copy(alpha = 0.9f)
 val TextSecondary = Color.White.copy(alpha = 0.7f)
 
-@Composable
-fun rememberMipmapPainter(): androidx.compose.ui.graphics.painter.Painter {
-    val context = LocalContext.current
-    return remember {
-        val drawable = androidx.core.content.ContextCompat.getDrawable(context, R.mipmap.ic_launcher)!!
-        BitmapPainter(drawable.toBitmap().asImageBitmap())
-    }
-}
 
 @Composable
 fun BadlockTheme(
@@ -834,6 +826,12 @@ fun MainScreen(cacheManager: CacheManager) {
 
     val downloadQueueManager = remember { DownloadQueueManager(context, coroutineScope) }
     val downloadStates = downloadQueueManager.downloadStates
+    // Load fallback icon once at screen level — safe from recomposition crashes
+    val fallbackPainter = remember {
+        val drawable = androidx.core.content.ContextCompat.getDrawable(context, R.mipmap.ic_launcher_foreground)
+            ?: androidx.core.content.ContextCompat.getDrawable(context, R.mipmap.ic_launcher)!!
+        BitmapPainter(drawable.toBitmap().asImageBitmap())
+    }
 
     fun refreshData(force: Boolean = false) {
         if (cacheManager.load(context) == null || force) moduleState = ModuleState.Loading
@@ -921,6 +919,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                     UpdatesPage(
                                         modules = modulesToShow,
                                         downloadStates = downloadStates,
+                                        fallbackPainter = fallbackPainter,
                                         onUpdateClick = onUpdateClick,
                                         onUpdateAllClick = {
                                             val toDownload = updatableModules.filter { m ->
@@ -936,6 +935,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                     ModuleList(
                                         modules = modulesToShow,
                                         downloadStates = downloadStates,
+                                        fallbackPainter = fallbackPainter,
                                         showEmptyMessage = false,
                                         onModuleClick = onModuleClick,
                                         onWebsiteClick = onWebsiteClick,
@@ -954,22 +954,25 @@ fun MainScreen(cacheManager: CacheManager) {
                             )
                         }
 
-                        // Pill-style nav bar
+                        // Pill-style nav bar — matches reference design
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(DarkSurface)
+                                .background(Color(0xFF1A1C26))
                                 .navigationBarsPadding()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
                             tabs.forEachIndexed { index, title ->
                                 val isSelected = pagerState.currentPage == index
-                                val pillColor by animateColorAsState(
-                                    targetValue = if (isSelected) PrimaryAccent.copy(alpha = 0.18f) else Color.Transparent,
-                                    animationSpec = tween(durationMillis = 250), label = "pill_color"
+                                val pillBg by animateColorAsState(
+                                    targetValue = if (isSelected) Color(0xFF2A2D3E) else Color.Transparent,
+                                    animationSpec = tween(durationMillis = 200), label = "pill_bg"
                                 )
-                                val contentColor = if (isSelected) PrimaryAccent else TextSecondary
+                                val contentColor by animateColorAsState(
+                                    targetValue = if (isSelected) PrimaryAccent else TextSecondary,
+                                    animationSpec = tween(durationMillis = 200), label = "pill_fg"
+                                )
                                 val icon = when (title) {
                                     "Updates" -> Icons.Default.SystemUpdate
                                     "Make up" -> Icons.Default.Palette
@@ -978,28 +981,34 @@ fun MainScreen(cacheManager: CacheManager) {
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .padding(horizontal = 4.dp)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
                                         .clip(RoundedCornerShape(50))
-                                        .background(pillColor)
+                                        .background(pillBg)
                                         .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                        .padding(vertical = 10.dp),
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
                                         if (title == "Updates" && updatableModules.isNotEmpty()) {
                                             BadgedBox(badge = { Badge(containerColor = PrimaryAccent) { Text("${updatableModules.size}") } }) {
-                                                Icon(icon, contentDescription = title, tint = contentColor, modifier = Modifier.size(24.dp))
+                                                Icon(icon, contentDescription = title, tint = contentColor, modifier = Modifier.size(22.dp))
                                             }
                                         } else {
-                                            Icon(icon, contentDescription = title, tint = contentColor, modifier = Modifier.size(24.dp))
+                                            Icon(icon, contentDescription = title, tint = contentColor, modifier = Modifier.size(22.dp))
                                         }
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            text = title,
-                                            color = contentColor,
-                                            fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                        )
+                                        if (isSelected) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                text = title,
+                                                color = contentColor,
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1016,6 +1025,7 @@ fun MainScreen(cacheManager: CacheManager) {
 fun UpdatesPage(
     modules: List<InstalledModule>,
     downloadStates: Map<String, DownloadState>,
+    fallbackPainter: androidx.compose.ui.graphics.painter.Painter,
     onUpdateClick: (InstalledModule) -> Unit,
     onUpdateAllClick: () -> Unit,
     onWebsiteClick: (String) -> Unit,
@@ -1080,6 +1090,7 @@ fun UpdatesPage(
                 UpdateModuleCard(
                     module = module,
                     downloadState = downloadState,
+                    fallbackPainter = fallbackPainter,
                     onUpdateClick = { onUpdateClick(module) },
                     onWebsiteClick = { onWebsiteClick(module.apkMirrorMainPage) },
                     onAppInfoClick = { onAppInfoClick(module.packageName) }
@@ -1094,6 +1105,7 @@ fun UpdatesPage(
 fun UpdateModuleCard(
     module: InstalledModule,
     downloadState: DownloadState?,
+    fallbackPainter: androidx.compose.ui.graphics.painter.Painter,
     onUpdateClick: () -> Unit,
     onWebsiteClick: () -> Unit,
     onAppInfoClick: () -> Unit
@@ -1113,7 +1125,7 @@ fun UpdateModuleCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = module.iconResId?.let { painterResource(id = it) } ?: rememberMipmapPainter(),
+                        painter = module.iconResId?.let { painterResource(id = it) } ?: fallbackPainter,
                         contentDescription = "${module.name} icon",
                         modifier = Modifier.size(32.dp)
                     )
@@ -1188,6 +1200,7 @@ fun UpdateModuleCard(
 fun ModuleList(
     modules: List<InstalledModule>,
     downloadStates: Map<String, DownloadState>,
+    fallbackPainter: androidx.compose.ui.graphics.painter.Painter,
     showEmptyMessage: Boolean = false,
     onModuleClick: (InstalledModule) -> Unit,
     onWebsiteClick: (String) -> Unit,
@@ -1216,6 +1229,7 @@ fun ModuleList(
                 ModuleCard(
                     module = module,
                     downloadState = downloadStates[module.packageName],
+                    fallbackPainter = fallbackPainter,
                     onModuleClick = { onModuleClick(module) },
                     onWebsiteClick = { onWebsiteClick(module.apkMirrorMainPage) },
                     onUpdateClick = { onUpdateClick(module) },
@@ -1232,6 +1246,7 @@ fun ModuleList(
 fun ModuleCard(
     module: InstalledModule,
     downloadState: DownloadState?,
+    fallbackPainter: androidx.compose.ui.graphics.painter.Painter,
     onModuleClick: () -> Unit,
     onWebsiteClick: () -> Unit,
     onUpdateClick: () -> Unit,
@@ -1253,7 +1268,7 @@ fun ModuleCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = module.iconResId?.let { painterResource(id = it) } ?: rememberMipmapPainter(),
+                        painter = module.iconResId?.let { painterResource(id = it) } ?: fallbackPainter,
                         contentDescription = "${module.name} icon",
                         modifier = Modifier.size(32.dp)
                     )
