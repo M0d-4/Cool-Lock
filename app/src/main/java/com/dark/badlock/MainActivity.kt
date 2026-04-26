@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -50,6 +51,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import androidx.core.graphics.drawable.toBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -85,6 +90,15 @@ val UpdateYellow = Color(0xFFFFD600)
 val InstallBlue = Color(0xFF2196F3)
 val TextPrimary = Color.White.copy(alpha = 0.9f)
 val TextSecondary = Color.White.copy(alpha = 0.7f)
+
+@Composable
+fun rememberMipmapPainter(): androidx.compose.ui.graphics.painter.Painter {
+    val context = LocalContext.current
+    return remember {
+        val drawable = androidx.core.content.ContextCompat.getDrawable(context, R.mipmap.ic_launcher)!!
+        BitmapPainter(drawable.toBitmap().asImageBitmap())
+    }
+}
 
 @Composable
 fun BadlockTheme(
@@ -945,6 +959,7 @@ fun MainScreen(cacheManager: CacheManager) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(DarkSurface)
+                                .navigationBarsPadding()
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
@@ -1098,7 +1113,7 @@ fun UpdateModuleCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.mipmap.ic_launcher),
+                        painter = module.iconResId?.let { painterResource(id = it) } ?: rememberMipmapPainter(),
                         contentDescription = "${module.name} icon",
                         modifier = Modifier.size(32.dp)
                     )
@@ -1238,7 +1253,7 @@ fun ModuleCard(
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.mipmap.ic_launcher),
+                        painter = module.iconResId?.let { painterResource(id = it) } ?: rememberMipmapPainter(),
                         contentDescription = "${module.name} icon",
                         modifier = Modifier.size(32.dp)
                     )
