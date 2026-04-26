@@ -49,6 +49,13 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    lint {
+        // Disable a lint detector that crashes with Kotlin 2.1 + AGP 8.7 (IncompatibleClassChangeError
+        // in NonNullableMutableLiveDataDetector). This is a bug in the lint tooling, not our code.
+        disable += "NullSafeMutableLiveData"
+        abortOnError = true
+    }
 }
 
 dependencies {
