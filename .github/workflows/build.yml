@@ -98,14 +98,14 @@ jobs:
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: badlock-debug-${{ github.sha }}
+          name: Cool-Lcok-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: badlock-release-${{ github.sha }}
+          name: Cool-Lcok-release-${{ github.sha }}
           path: |
             app/build/outputs/apk/release/app-release-unsigned.apk
             app/build/outputs/apk/release/app-release-signed.apk
@@ -137,26 +137,26 @@ jobs:
       - name: Download release APK artifact
         uses: actions/download-artifact@v4
         with:
-          name: badlock-release-${{ github.sha }}
+          name: Cool-Lcok-release-${{ github.sha }}
           path: apk/release
 
       - name: Download debug APK artifact
         uses: actions/download-artifact@v4
         with:
-          name: badlock-debug-${{ github.sha }}
+          name: Cool-Lcok-debug-${{ github.sha }}
           path: apk/debug
 
       - name: Rename APKs with version
         run: |
           TAG="${{ steps.tag.outputs.name }}"
-          mv apk/release/app-release-signed.apk   apk/release/badlock-${TAG}.apk
-          mv apk/debug/app-debug.apk              apk/debug/badlock-${TAG}-debug.apk
+          mv apk/release/app-release-signed.apk   apk/release/Cool-Lcok-${TAG}.apk
+          mv apk/debug/app-debug.apk              apk/debug/Cool-Lcok-${TAG}-debug.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.name }}
-          name: Badlock ${{ steps.tag.outputs.name }}
+          name: Cool-Lcok ${{ steps.tag.outputs.name }}
           draft: false
           prerelease: false
           generate_release_notes: true
