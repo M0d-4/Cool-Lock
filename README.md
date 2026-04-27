@@ -1,8 +1,4 @@
-<div align="center">
-
-#Badlock
-
-![SmartSelect_20250814_230744_One UI Home](https://github.com/user-attachments/assets/0e9e5b89-7dc5-4962-878e-3f78504e381b)
+#Cool-Lock
 
 Reimagining the Good Lock experience.
 
@@ -25,28 +21,8 @@ Updates Hub: A dedicated tab that clearly lists all modules with available updat
 
 App Info Shortcut: A one-tap shortcut to the Android App Info screen for easy management of installed modules.
 
-📸 Screenshots
-<div align="center">
-
-Main 
-
-![Screenshot_20250818_191004_badlock](https://github.com/user-attachments/assets/b56d8995-8385-4162-b922-8df04f1650eb)
-Screen
-![Screenshot_20250820_085908_badlock](https://github.com/user-attachments/assets/2d8f18eb-730f-456c-8b0d-653c27ab18e4)
-
-
-Updates Tab
-
-
-![Screenshot_20250820_085914_badlock](https://github.com/user-attachments/assets/ab9e610a-d298-45fc-9b8c-a81db7aae674)
-
-
-
-
-</div>
-
 🚀 Download
-Get the latest version of Badlock from the Releases page.
+Get the latest version of Cool-Lock from the Releases page.
 
 
 
@@ -63,7 +39,7 @@ Samsung Electronics
 Apk Mirror
 
 ⚠️ Disclaimer
-This application, Badlock, is an independent, fan-made project and is not affiliated with, endorsed, or sponsored by Samsung or APKMirror in any way.
+This application, Cool-Lock, is an independent, fan-made project and is not affiliated with, endorsed, or sponsored by Samsung or APKMirror in any way.
 
 All Good Lock module names, icons, and related trademarks are the property of Samsung Electronics Co., Ltd.
 
