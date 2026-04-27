@@ -2,19 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Network access for update checks and APK downloads -->
+    <!-- REQUIRED: For checking for module updates online -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
-    <!-- Required to see and launch other Good Lock modules -->
+    <!-- REQUIRED: Allows the app to see and launch other Good Lock modules -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
-
-    <!-- Required to install downloaded APKs -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-
-    <!-- Required to write APKs to downloads folder (Android 9 and below) -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28"/>
 
     <application
         android:allowBackup="true"
@@ -37,17 +30,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- FileProvider for sharing downloaded APK files with the package installer -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
 
     </application>
 </manifest>
