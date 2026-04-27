@@ -787,7 +787,7 @@ fun MainScreen(cacheManager: CacheManager) {
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Badlock", fontWeight = FontWeight.Bold, color = TextPrimary) },
+                title = { Text("Cool-Lock", fontWeight = FontWeight.Bold, color = TextPrimary) },
                 actions = {
                     IconButton(onClick = { refreshData(force = true) }, enabled = moduleState != ModuleState.Loading) {
                         Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondary)
