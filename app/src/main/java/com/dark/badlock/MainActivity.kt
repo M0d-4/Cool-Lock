@@ -16,6 +16,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -42,6 +45,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -75,6 +79,8 @@ val DarkSurface = Color(0xFF1E1E1E)
 val PrimaryAccent = Color(0xFF8A2BE2) // Electric Blue-Violet
 val GreenAccent = Color(0xFF00FFA3) // Neon Mint
 val InstallBlue = Color(0xFF0A3D91) // Dark Blue
+val UpdateOlive = Color(0xFF6B7C2D) // Olive green for update button
+val UpdateLatestRed = Color(0xFF8B0000) // Dark red for "Latest" text on update
 val UpdateYellow = Color(0xFFFFD600) // Vibrant Yellow
 val TextPrimary = Color.White.copy(alpha = 0.9f)
 val TextSecondary = Color.White.copy(alpha = 0.7f)
@@ -841,22 +847,43 @@ fun MainScreen(cacheManager: CacheManager) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .align(Alignment.BottomCenter)
-                                    .padding(horizontal = 32.dp, vertical = 20.dp)
+                                    .padding(horizontal = 0.dp, vertical = 0.dp)
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                                        .shadow(
+                                            elevation = 24.dp,
+                                            shape = RoundedCornerShape(50.dp),
+                                            ambientColor = Color.Black.copy(alpha = 0.8f),
+                                            spotColor = Color.Black.copy(alpha = 0.9f)
+                                        )
                                         .clip(RoundedCornerShape(50.dp))
-                                        .background(Color(0xFF1A1A1A).copy(alpha = 0.92f))
-                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                        .background(Color(0xFF1A1A1A))
+                                        .padding(horizontal = 8.dp, vertical = 8.dp),
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     tabs.forEachIndexed { index, title ->
                                         val isSelected = pagerState.currentPage == index
                                         val tabBg by animateColorAsState(
-                                            targetValue = if (isSelected) PrimaryAccent.copy(alpha = 0.85f) else Color.Transparent,
-                                            animationSpec = tween(durationMillis = 300)
+                                            targetValue = if (isSelected) PrimaryAccent else Color.Transparent,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        )
+                                        val iconTint by animateColorAsState(
+                                            targetValue = if (isSelected) Color.White else TextSecondary,
+                                            animationSpec = tween(durationMillis = 250)
+                                        )
+                                        val horizontalPad by animateDpAsState(
+                                            targetValue = if (isSelected) 18.dp else 14.dp,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
                                         )
                                         val icon = when (title) {
                                             "Updates" -> Icons.Default.SystemUpdate
@@ -868,21 +895,21 @@ fun MainScreen(cacheManager: CacheManager) {
                                                 .clip(RoundedCornerShape(50.dp))
                                                 .background(tabBg)
                                                 .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                                .padding(horizontal = if (isSelected) 16.dp else 12.dp, vertical = 8.dp),
+                                                .padding(horizontal = horizontalPad, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.Center
                                         ) {
                                             if (title == "Updates" && updatableModules.isNotEmpty()) {
                                                 BadgedBox(
-                                                    badge = { Badge(containerColor = UpdateYellow, contentColor = Color.Black) { Text("${updatableModules.size}") } }
+                                                    badge = { Badge(containerColor = UpdateOlive, contentColor = Color.White) { Text("${updatableModules.size}") } }
                                                 ) {
-                                                    Icon(icon, contentDescription = title, tint = if (isSelected) Color.White else TextSecondary, modifier = Modifier.size(20.dp))
+                                                    Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
                                                 }
                                             } else {
-                                                Icon(icon, contentDescription = title, tint = if (isSelected) Color.White else TextSecondary, modifier = Modifier.size(20.dp))
+                                                Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
                                             }
                                             if (isSelected) {
-                                                Spacer(Modifier.width(6.dp))
+                                                Spacer(Modifier.width(7.dp))
                                                 Text(title, fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 13.sp)
                                             }
                                         }
@@ -975,7 +1002,7 @@ fun ModuleCard(
                     if (module.isUpdateAvailable) {
                         Button(
                             onClick = onUpdateClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = UpdateYellow, contentColor = Color.Black),
+                            colors = ButtonDefaults.buttonColors(containerColor = UpdateOlive, contentColor = Color.White),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
@@ -1007,7 +1034,7 @@ fun VersionInfo(module: InstalledModule) {
     Text(versionText, color = TextSecondary, fontSize = 12.sp, maxLines = 1)
 
     if (module.latestVersion != null) {
-        val color = if (module.isUpdateAvailable) UpdateYellow else TextSecondary
+        val color = if (module.isUpdateAvailable) UpdateLatestRed else TextSecondary
         Text("Latest: v${module.latestVersion}", color = color, fontSize = 12.sp, maxLines = 1)
 
         val minVersionText = if (!module.minAndroidVersion.isNullOrBlank()) {
