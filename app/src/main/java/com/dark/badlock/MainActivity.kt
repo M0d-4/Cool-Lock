@@ -42,7 +42,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -71,10 +70,11 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 // --- UI THEME & COLORS ---
-val DarkBackground = Color(0xFF10121A)
-val DarkSurface = Color(0xFF1C1E28)
+val DarkBackground = Color(0xFF000000)
+val DarkSurface = Color(0xFF1E1E1E)
 val PrimaryAccent = Color(0xFF8A2BE2) // Electric Blue-Violet
 val GreenAccent = Color(0xFF00FFA3) // Neon Mint
+val InstallBlue = Color(0xFF0A3D91) // Dark Blue
 val UpdateYellow = Color(0xFFFFD600) // Vibrant Yellow
 val TextPrimary = Color.White.copy(alpha = 0.9f)
 val TextSecondary = Color.White.copy(alpha = 0.7f)
@@ -836,54 +836,58 @@ fun MainScreen(cacheManager: CacheManager) {
                                     onAppInfoClick = onAppInfoClick
                                 )
                             }
+                            // Floating pill tab bar overlaid at the bottom
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(32.dp)
                                     .align(Alignment.BottomCenter)
-                                    .background(brush = Brush.verticalGradient(colors = listOf(Color.Transparent, DarkBackground)))
-                            )
-                        }
-
-                        TabRow(
-                            selectedTabIndex = pagerState.currentPage,
-                            containerColor = DarkBackground,
-                            indicator = {},
-                            divider = {}
-                        ) {
-                            tabs.forEachIndexed { index, title ->
-                                val isSelected = pagerState.currentPage == index
-                                val tabColor by animateColorAsState(
-                                    targetValue = if (isSelected) DarkSurface else Color.Transparent,
-                                    animationSpec = tween(durationMillis = 300)
-                                )
-                                Tab(
-                                    selected = isSelected,
-                                    onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
+                                    .padding(horizontal = 32.dp, vertical = 20.dp)
+                            ) {
+                                Row(
                                     modifier = Modifier
-                                        .padding(vertical = 8.dp, horizontal = 12.dp)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(tabColor),
-                                    text = {
-                                        if (title == "Updates" && updatableModules.isNotEmpty()) {
-                                            BadgedBox(
-                                                badge = { Badge(containerColor = PrimaryAccent) { Text("${updatableModules.size}") } }
-                                            ) { Text(title, fontWeight = FontWeight.SemiBold) }
-                                        } else {
-                                            Text(title, fontWeight = FontWeight.SemiBold)
-                                        }
-                                    },
-                                    icon = {
-                                        val icon = when(title) {
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(50.dp))
+                                        .background(Color(0xFF1A1A1A).copy(alpha = 0.92f))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    tabs.forEachIndexed { index, title ->
+                                        val isSelected = pagerState.currentPage == index
+                                        val tabBg by animateColorAsState(
+                                            targetValue = if (isSelected) PrimaryAccent.copy(alpha = 0.85f) else Color.Transparent,
+                                            animationSpec = tween(durationMillis = 300)
+                                        )
+                                        val icon = when (title) {
                                             "Updates" -> Icons.Default.SystemUpdate
                                             "Make up" -> Icons.Default.Palette
                                             else -> Icons.Default.Style
                                         }
-                                        Icon(icon, contentDescription = title)
-                                    },
-                                    selectedContentColor = PrimaryAccent,
-                                    unselectedContentColor = TextSecondary
-                                )
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(50.dp))
+                                                .background(tabBg)
+                                                .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
+                                                .padding(horizontal = if (isSelected) 16.dp else 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            if (title == "Updates" && updatableModules.isNotEmpty()) {
+                                                BadgedBox(
+                                                    badge = { Badge(containerColor = UpdateYellow, contentColor = Color.Black) { Text("${updatableModules.size}") } }
+                                                ) {
+                                                    Icon(icon, contentDescription = title, tint = if (isSelected) Color.White else TextSecondary, modifier = Modifier.size(20.dp))
+                                                }
+                                            } else {
+                                                Icon(icon, contentDescription = title, tint = if (isSelected) Color.White else TextSecondary, modifier = Modifier.size(20.dp))
+                                            }
+                                            if (isSelected) {
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(title, fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 13.sp)
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -916,7 +920,7 @@ fun ModuleList(
         }
     } else {
         LazyColumn(
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(items = modules, key = { it.packageName }) { module ->
@@ -942,7 +946,7 @@ fun ModuleCard(
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = DarkSurface.copy(alpha = 0.8f)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2C2C2C)),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onModuleClick)
     ) {
         Row(
@@ -979,7 +983,7 @@ fun ModuleCard(
                 } else {
                     Button(
                         onClick = onWebsiteClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = GreenAccent, contentColor = Color.Black),
+                        colors = ButtonDefaults.buttonColors(containerColor = InstallBlue, contentColor = Color.White),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp)
                     ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 12.sp) }

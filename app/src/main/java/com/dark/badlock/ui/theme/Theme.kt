@@ -6,36 +6,36 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Define the colors to match Good Lock's clean aesthetic
-val GoodLockBlue = Color(0xFF6B4BFF)
-val GoodLockBackground = Color(0xFFF0F0F0)
-val GoodLockCard = Color(0xFFFFFFFF)
-val GoodLockPurple = Color(0xFF5A44E5) // A variant of blue used in buttons
+// Define the colors to match Cool-Lock's dark aesthetic
+val GoodLockBlue = Color(0xFF0A3D91)        // Dark Blue (matches InstallBlue)
+val GoodLockBackground = Color(0xFF000000)  // Pure Black
+val GoodLockCard = Color(0xFF2C2C2C)        // Lighter dark card
+val GoodLockPurple = Color(0xFF8A2BE2)      // Electric Blue-Violet accent
 
 private val LightColorScheme = lightColorScheme(
     primary = GoodLockBlue,
-    secondary = GoodLockBackground,
+    secondary = GoodLockPurple,
     tertiary = GoodLockCard,
     background = GoodLockBackground,
     surface = GoodLockCard,
     onPrimary = Color.White,
-    onSecondary = Color.Black,
-    onTertiary = Color.Black,
-    onBackground = Color.Black,
-    onSurface = Color.Black,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color.White,
+    onSurface = Color.White,
 )
 
 private val DarkColorScheme = darkColorScheme(
     primary = GoodLockBlue,
-    secondary = GoodLockBackground,
+    secondary = GoodLockPurple,
     tertiary = GoodLockCard,
     background = GoodLockBackground,
     surface = GoodLockCard,
     onPrimary = Color.White,
-    onSecondary = Color.Black,
-    onTertiary = Color.Black,
-    onBackground = Color.Black,
-    onSurface = Color.Black,
+    onSecondary = Color.White,
+    onTertiary = Color.White,
+    onBackground = Color.White,
+    onSurface = Color.White,
 )
 
 @Composable
