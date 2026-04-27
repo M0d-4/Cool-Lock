@@ -150,7 +150,6 @@ jobs:
         run: |
           TAG="${{ steps.tag.outputs.name }}"
           mv apk/release/app-release-signed.apk   apk/release/badlock-${TAG}.apk
-          mv apk/release/app-release-unsigned.apk apk/release/badlock-${TAG}-unsigned.apk
           mv apk/debug/app-debug.apk              apk/debug/badlock-${TAG}-debug.apk
 
       - name: Create GitHub Release
@@ -162,6 +161,5 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            apk/release/badlock-${{ steps.tag.outputs.name }}.apk
-            apk/release/badlock-${{ steps.tag.outputs.name }}-unsigned.apk
-            apk/debug/badlock-${{ steps.tag.outputs.name }}-debug.apk
+            apk/release/Cool-Lock-${{ steps.tag.outputs.name }}.apk
+            apk/debug/Cool-Lock-${{ steps.tag.outputs.name }}-debug.apk
