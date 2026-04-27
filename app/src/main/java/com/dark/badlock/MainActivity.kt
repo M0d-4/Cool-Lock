@@ -820,7 +820,7 @@ fun MainScreen(cacheManager: CacheManager) {
                             HorizontalPager(
                                 state = pagerState,
                                 modifier = Modifier.fillMaxSize(),
-                                beyondBoundsPageCount = 1
+                                beyondViewportPageCount = 1
                             ) { page ->
                                 val pageTitle = tabs[page]
                                 val modulesToShow = when (pageTitle) {
@@ -955,7 +955,7 @@ fun ModuleCard(
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.drawable.ic_launcher_foreground),
+                    painter = module.iconResId?.let { painterResource(id = it) } ?: painterResource(id = R.mipmap.ic_launcher_foreground),
                     contentDescription = "${module.name} icon",
                     modifier = Modifier.size(32.dp)
                 )
