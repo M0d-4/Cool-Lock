@@ -45,7 +45,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -77,6 +76,7 @@ import java.net.UnknownHostException
 val DarkBackground = Color(0xFF000000)
 val DarkSurface = Color(0xFF1E1E1E)
 val PrimaryAccent = Color(0xFF8A2BE2) // Electric Blue-Violet
+val TabActiveDarkPurple = Color(0xFF2D1B4E) // Dark purple for active tab button
 val GreenAccent = Color(0xFF00FFA3) // Neon Mint
 val InstallBlue = Color(0xFF0A3D91) // Dark Blue
 val UpdateOlive = Color(0xFF6B7C2D) // Olive green for update button
@@ -842,23 +842,33 @@ fun MainScreen(cacheManager: CacheManager) {
                                     onAppInfoClick = onAppInfoClick
                                 )
                             }
-                            // Floating pill tab bar overlaid at the bottom
+                            // Gradient scrim + floating pill tab bar
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .align(Alignment.BottomCenter)
-                                    .padding(horizontal = 0.dp, vertical = 0.dp)
                             ) {
+                                // Full-width gradient scrim behind the pill
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(120.dp)
+                                        .align(Alignment.BottomCenter)
+                                        .background(
+                                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Transparent,
+                                                    Color.Black.copy(alpha = 0.6f),
+                                                    Color.Black.copy(alpha = 0.95f),
+                                                    Color.Black
+                                                )
+                                            )
+                                        )
+                                )
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp, vertical = 12.dp)
-                                        .shadow(
-                                            elevation = 24.dp,
-                                            shape = RoundedCornerShape(50.dp),
-                                            ambientColor = Color.Black.copy(alpha = 0.8f),
-                                            spotColor = Color.Black.copy(alpha = 0.9f)
-                                        )
                                         .clip(RoundedCornerShape(50.dp))
                                         .background(Color(0xFF1A1A1A))
                                         .padding(horizontal = 8.dp, vertical = 8.dp),
@@ -868,7 +878,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                     tabs.forEachIndexed { index, title ->
                                         val isSelected = pagerState.currentPage == index
                                         val tabBg by animateColorAsState(
-                                            targetValue = if (isSelected) PrimaryAccent else Color.Transparent,
+                                            targetValue = if (isSelected) TabActiveDarkPurple else Color.Transparent,
                                             animationSpec = spring(
                                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                                 stiffness = Spring.StiffnessMedium
