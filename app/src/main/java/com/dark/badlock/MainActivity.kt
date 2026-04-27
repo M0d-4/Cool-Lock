@@ -868,6 +868,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .align(Alignment.BottomCenter)
                                         .padding(horizontal = 16.dp, vertical = 4.dp)
                                         .clip(RoundedCornerShape(50.dp))
                                         .background(Color(0xFF1A1A1A))
