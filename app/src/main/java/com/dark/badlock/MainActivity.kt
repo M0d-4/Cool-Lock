@@ -39,8 +39,7 @@ import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.*import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -71,28 +70,93 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 // --- UI THEME & COLORS ---
-val DarkBackground = Color(0xFF000000)
-val DarkSurface = Color(0xFF1E1E1E)
-val PrimaryAccent = Color(0xFF8A2BE2) // Electric Blue-Violet
-val TabActiveDarkPurple = Color(0xFF1A1A2E) // Dark navy, close to app background
-val GreenAccent = Color(0xFF00FFA3) // Neon Mint
-val InstallBlue = Color(0xFF0A3D91) // Dark Blue
-val UpdateOlive = Color(0xFF2A3010) // Dark muted olive for update button
-val UpdateLatestAmber = Color(0xFFB8860B) // Dark amber/gold for "Latest" update text
-val UpdateYellow = Color(0xFFFFD600) // Vibrant Yellow
-val TextPrimary = Color.White.copy(alpha = 0.9f)
-val TextSecondary = Color.White.copy(alpha = 0.7f)
+// --- THEME COLORS ---
+data class AppColors(
+    val background: Color,
+    val surface: Color,
+    val cardBackground: Color,
+    val iconBox: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val tabActive: Color,
+    val tabBarBackground: Color,
+    val tabBarScrimEnd: Color,
+    val pillBarBg: Color,
+    val openButtonBg: Color,
+    val installButtonBg: Color,
+    val updateButtonBg: Color,
+    val updateLatestText: Color,
+    val websiteIconTint: Color,
+    val titleBarBackground: Color,
+    val accentPrimary: Color,
+    val badgeBg: Color
+)
+
+val DarkAppColors = AppColors(
+    background        = Color(0xFF000000),
+    surface           = Color(0xFF1E1E1E),
+    cardBackground    = Color(0xFF141414),
+    iconBox           = Color(0xFF1C1C1C),
+    textPrimary       = Color.White.copy(alpha = 0.9f),
+    textSecondary     = Color.White.copy(alpha = 0.6f),
+    tabActive         = Color(0xFF1A1A2E),
+    tabBarBackground  = Color(0xFF1A1A1A),
+    tabBarScrimEnd    = Color.Black,
+    pillBarBg         = Color(0xFF1A1A1A),
+    openButtonBg      = Color(0xFF1A1A3A),
+    installButtonBg   = Color(0xFF0A1F4E),
+    updateButtonBg    = Color(0xFF2A3010),
+    updateLatestText  = Color(0xFFB8860B),
+    websiteIconTint   = Color.White.copy(alpha = 0.35f),
+    titleBarBackground= Color(0xFF000000),
+    accentPrimary     = Color(0xFF8A2BE2),
+    badgeBg           = Color(0xFF2A3010)
+)
+
+val LightAppColors = AppColors(
+    background        = Color(0xFFF2F2F7),
+    surface           = Color(0xFFFFFFFF),
+    cardBackground    = Color(0xFFFFFFFF),
+    iconBox           = Color(0xFFEEEEF4),
+    textPrimary       = Color(0xFF1C1C1E),
+    textSecondary     = Color(0xFF6C6C70),
+    tabActive         = Color(0xFFDDDDF0),
+    tabBarBackground  = Color(0xFFFFFFFF),
+    tabBarScrimEnd    = Color(0xFFF2F2F7),
+    pillBarBg         = Color(0xFFFFFFFF),
+    openButtonBg      = Color(0xFFDDDDF0),
+    installButtonBg   = Color(0xFFD0E0FF),
+    updateButtonBg    = Color(0xFFE8F0C8),
+    updateLatestText  = Color(0xFF8B6914),
+    websiteIconTint   = Color(0xFF6C6C70),
+    titleBarBackground= Color(0xFFF2F2F7),
+    accentPrimary     = Color(0xFF6B3FA0),
+    badgeBg           = Color(0xFF7A8C2A)
+)
+
+val LocalAppColors = staticCompositionLocalOf { DarkAppColors }
 
 @Composable
-fun BadlockTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
-) {
-    MaterialTheme(
-        typography = Typography(),
-        content = content
-    )
+fun AppTheme(content: @Composable () -> Unit) {
+    val isDark = isSystemInDarkTheme()
+    val colors = if (isDark) DarkAppColors else LightAppColors
+    CompositionLocalProvider(LocalAppColors provides colors) {
+        MaterialTheme(typography = Typography(), content = content)
+    }
 }
+
+// Convenience accessor
+val appColors: AppColors
+    @Composable get() = LocalAppColors.current
+
+// Legacy aliases so existing references keep compiling
+val DarkBackground   @Composable get() = LocalAppColors.current.background
+val PrimaryAccent    @Composable get() = LocalAppColors.current.accentPrimary
+val TextPrimary      @Composable get() = LocalAppColors.current.textPrimary
+val TextSecondary    @Composable get() = LocalAppColors.current.textSecondary
+val UpdateOlive      @Composable get() = LocalAppColors.current.updateButtonBg
+val UpdateLatestAmber @Composable get() = LocalAppColors.current.updateLatestText
+val InstallBlue      @Composable get() = LocalAppColors.current.installButtonBg
 
 // --- DATA & STATE CLASSES ---
 data class ModuleInfo(
@@ -375,24 +439,25 @@ fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: St
     return when (packageName) {
         "com.samsung.android.app.clockface" -> {
             Log.d("BadlockLaunch", "Clockface: trying launch intents.")
-            val attempts = listOf(
-                Intent().apply {
-                    component = ComponentName(
-                        "com.samsung.android.app.clockface",
-                        "com.samsung.android.app.clockface.ClockfaceActivity"
-                    )
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                },
-                Intent().apply {
-                    component = ComponentName(
-                        "com.samsung.android.app.dressroom",
-                        "com.samsung.android.app.dressroom.presentation.settings.WallpaperSettingActivity"
-                    )
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                },
-                Intent("android.settings.DISPLAY_SETTINGS")
+            // Try Clockface's own exported activities first
+            val clockfaceActivities = listOf(
+                "com.samsung.android.app.clockface.ClockfaceActivity",
+                "com.samsung.android.app.clockface.MainActivity",
+                "com.samsung.android.app.clockface.presentation.ClockfaceActivity"
             )
-            attempts.firstOrNull { context.packageManager.resolveActivity(it, 0) != null }
+            val direct = findWorkingActivity(context, packageName, clockfaceActivities)
+            if (direct != null) return direct
+
+            // Try deep search within the Clockface package
+            val deep = findBestActivityDeepSearch(context, packageName, moduleName)
+            if (deep != null) return deep
+
+            // Launch Good Lock itself as last resort so the user can navigate manually
+            val goodLock = context.packageManager.getLaunchIntentForPackage("com.samsung.android.goodlock")
+                ?: context.packageManager.getLaunchIntentForPackage("com.lge.launcher3")
+            if (goodLock != null) return goodLock.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+
+            null
         }
         "com.samsung.systemui.lockstar" -> {
             val settingsLockIntent = Intent().apply {
@@ -712,7 +777,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         installSplashScreen()
         setContent {
-            BadlockTheme {
+            AppTheme {
                 val view = LocalView.current
                 if (!view.isInEditMode) {
                     SideEffect {
@@ -722,7 +787,7 @@ class MainActivity : ComponentActivity() {
                         WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
                     }
                 }
-                Surface(modifier = Modifier.fillMaxSize(), color = DarkBackground) {
+                Surface(modifier = Modifier.fillMaxSize(), color = appColors.background) {
                     MainScreen(cacheManager)
                 }
             }
@@ -788,13 +853,13 @@ fun MainScreen(cacheManager: CacheManager) {
     }
 
     Scaffold(
-        containerColor = DarkBackground
+        containerColor = appColors.background
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             when (val state = moduleState) {
                 is ModuleState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = PrimaryAccent)
+                        CircularProgressIndicator(color = appColors.accentPrimary)
                     }
                 }
                 is ModuleState.Error -> {
@@ -845,9 +910,9 @@ fun MainScreen(cacheManager: CacheManager) {
                                             brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                                                 colors = listOf(
                                                     Color.Transparent,
-                                                    Color.Black.copy(alpha = 0.6f),
-                                                    Color.Black.copy(alpha = 0.95f),
-                                                    Color.Black
+                                                    appColors.tabBarScrimEnd.copy(alpha = 0.6f),
+                                                    appColors.tabBarScrimEnd.copy(alpha = 0.95f),
+                                                    appColors.tabBarScrimEnd
                                                 )
                                             )
                                         )
@@ -858,7 +923,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                         .align(Alignment.BottomCenter)
                                         .padding(horizontal = 16.dp, vertical = 4.dp)
                                         .clip(RoundedCornerShape(50.dp))
-                                        .background(Color(0xFF1A1A1A))
+                                        .background(appColors.pillBarBg)
                                         .padding(horizontal = 8.dp, vertical = 8.dp),
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
@@ -866,14 +931,14 @@ fun MainScreen(cacheManager: CacheManager) {
                                     tabs.forEachIndexed { index, title ->
                                         val isSelected = pagerState.currentPage == index
                                         val tabBg by animateColorAsState(
-                                            targetValue = if (isSelected) TabActiveDarkPurple else Color.Transparent,
+                                            targetValue = if (isSelected) appColors.tabActive else Color.Transparent,
                                             animationSpec = spring(
                                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                                 stiffness = Spring.StiffnessMedium
                                             )
                                         )
                                         val iconTint by animateColorAsState(
-                                            targetValue = if (isSelected) Color.White else TextSecondary,
+                                            targetValue = if (isSelected) appColors.textPrimary else appColors.textSecondary,
                                             animationSpec = tween(durationMillis = 250)
                                         )
                                         val horizontalPad by animateDpAsState(
@@ -899,7 +964,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                         ) {
                                             if (title == "Updates" && updatableModules.isNotEmpty()) {
                                                 BadgedBox(
-                                                    badge = { Badge(containerColor = UpdateOlive, contentColor = Color.White) { Text("${updatableModules.size}") } }
+                                                    badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}") } }
                                                 ) {
                                                     Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
                                                 }
@@ -910,7 +975,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                             Text(
                                                 title,
                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                color = if (isSelected) Color.White else TextSecondary,
+                                                color = if (isSelected) appColors.textPrimary else appColors.textSecondary,
                                                 fontSize = 13.sp
                                             )
                                         }
@@ -923,7 +988,7 @@ fun MainScreen(cacheManager: CacheManager) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(DarkBackground)
+                                .background(appColors.titleBarBackground)
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -931,7 +996,7 @@ fun MainScreen(cacheManager: CacheManager) {
                             Text(
                                 "Cool-Lock",
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimary,
+                                color = appColors.textPrimary,
                                 fontSize = 20.sp
                             )
                             IconButton(
@@ -941,7 +1006,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
                                     contentDescription = "Refresh",
-                                    tint = TextSecondary
+                                    tint = appColors.textSecondary
                                 )
                             }
                         }
@@ -968,11 +1033,11 @@ fun ModuleList(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(imageVector = Icons.Default.SystemUpdate, contentDescription = "All up to date", tint = TextSecondary, modifier = Modifier.size(64.dp))
+            Icon(imageVector = Icons.Default.SystemUpdate, contentDescription = "All up to date", tint = appColors.textSecondary, modifier = Modifier.size(64.dp))
             Spacer(modifier = Modifier.height(16.dp))
-            Text("All Clear!", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+            Text("All Clear!", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = appColors.textPrimary)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("All your modules are up-to-date.", color = TextSecondary, textAlign = TextAlign.Center)
+            Text("All your modules are up-to-date.", color = appColors.textSecondary, textAlign = TextAlign.Center)
         }
     } else {
         LazyColumn(
@@ -1004,7 +1069,7 @@ fun ModuleCard(
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
+        colors = CardDefaults.cardColors(containerColor = appColors.cardBackground),
         modifier = Modifier.fillMaxWidth().clickable(onClick = onAppInfoClick)
     ) {
         Row(
@@ -1013,7 +1078,7 @@ fun ModuleCard(
         ) {
             Box(
                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF1C1C1C)),
+                    .background(appColors.iconBox),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -1024,7 +1089,7 @@ fun ModuleCard(
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(module.name, fontWeight = FontWeight.SemiBold, color = TextPrimary, fontSize = 16.sp)
+                Text(module.name, fontWeight = FontWeight.SemiBold, color = appColors.textPrimary, fontSize = 16.sp)
                 Spacer(Modifier.height(4.dp))
                 VersionInfo(module)
             }
@@ -1037,7 +1102,7 @@ fun ModuleCard(
                     if (module.isUpdateAvailable) {
                         Button(
                             onClick = onUpdateClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = UpdateOlive, contentColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = appColors.updateButtonBg, contentColor = Color.White),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                             modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
@@ -1045,7 +1110,7 @@ fun ModuleCard(
                     }
                     Button(
                         onClick = onOpenClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A3A), contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = appColors.openButtonBg, contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
@@ -1053,7 +1118,7 @@ fun ModuleCard(
                 } else {
                     Button(
                         onClick = onWebsiteClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A1F4E), contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = appColors.installButtonBg, contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
@@ -1061,7 +1126,7 @@ fun ModuleCard(
                 }
             }
             IconButton(onClick = onWebsiteClick) {
-                Icon(Icons.Default.Public, contentDescription = "Go to Website", tint = TextSecondary.copy(alpha = 0.5f))
+                Icon(Icons.Default.Public, contentDescription = "Go to Website", tint = appColors.websiteIconTint)
             }
         }
     }
@@ -1070,10 +1135,10 @@ fun ModuleCard(
 @Composable
 fun VersionInfo(module: InstalledModule) {
     val versionText = if (module.isInstalled) "v${module.versionName ?: "N/A"}" else "Not Installed"
-    Text(versionText, color = TextSecondary, fontSize = 12.sp, maxLines = 1)
+    Text(versionText, color = appColors.textSecondary, fontSize = 12.sp, maxLines = 1)
 
     if (module.latestVersion != null) {
-        val color = if (module.isUpdateAvailable) UpdateLatestAmber else TextSecondary
+        val color = if (module.isUpdateAvailable) appColors.updateLatestText else appColors.textSecondary
         Text("Latest: v${module.latestVersion}", color = color, fontSize = 12.sp, maxLines = 1)
 
         val minVersionText = if (!module.minAndroidVersion.isNullOrBlank()) {
@@ -1081,14 +1146,14 @@ fun VersionInfo(module: InstalledModule) {
         } else {
             "N/A"
         }
-        Text("Requires: $minVersionText", color = TextSecondary, fontSize = 12.sp, maxLines = 1)
+        Text("Requires: $minVersionText", color = appColors.textSecondary, fontSize = 12.sp, maxLines = 1)
     }
 
     if (module.latestVersion == null && module.isInstalled) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.CloudOff, contentDescription = "Error fetching version", tint = TextSecondary, modifier = Modifier.size(12.dp))
+            Icon(Icons.Default.CloudOff, contentDescription = "Error fetching version", tint = appColors.textSecondary, modifier = Modifier.size(12.dp))
             Spacer(Modifier.width(4.dp))
-            Text("Update check failed", color = TextSecondary, fontSize = 12.sp)
+            Text("Update check failed", color = appColors.textSecondary, fontSize = 12.sp)
         }
     }
 }
@@ -1100,14 +1165,14 @@ fun ErrorScreen(errorMessage: String, onRetry: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(imageVector = Icons.Default.SignalWifiOff, contentDescription = "Connection Error", tint = TextSecondary, modifier = Modifier.size(64.dp))
+        Icon(imageVector = Icons.Default.SignalWifiOff, contentDescription = "Connection Error", tint = appColors.textSecondary, modifier = Modifier.size(64.dp))
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Connection Error", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+        Text("Connection Error", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = appColors.textPrimary)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(errorMessage, color = TextSecondary, textAlign = TextAlign.Center)
+        Text(errorMessage, color = appColors.textSecondary, textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = PrimaryAccent)) {
-            Text("Retry")
+        Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = appColors.accentPrimary)) {
+            Text("Retry", color = Color.White)
         }
     }
 }
