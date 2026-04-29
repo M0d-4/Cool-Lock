@@ -74,11 +74,11 @@ import java.net.UnknownHostException
 val DarkBackground = Color(0xFF000000)
 val DarkSurface = Color(0xFF1E1E1E)
 val PrimaryAccent = Color(0xFF8A2BE2) // Electric Blue-Violet
-val TabActiveDarkPurple = Color(0xFF2D1B4E) // Dark purple for active tab button
+val TabActiveDarkPurple = Color(0xFF1A1A2E) // Dark navy, close to app background
 val GreenAccent = Color(0xFF00FFA3) // Neon Mint
 val InstallBlue = Color(0xFF0A3D91) // Dark Blue
 val UpdateOlive = Color(0xFF2A3010) // Dark muted olive for update button
-val UpdateLatestRed = Color(0xFF8B0000) // Dark red for "Latest" text on update
+val UpdateLatestAmber = Color(0xFFB8860B) // Dark amber/gold for "Latest" update text
 val UpdateYellow = Color(0xFFFFD600) // Vibrant Yellow
 val TextPrimary = Color.White.copy(alpha = 0.9f)
 val TextSecondary = Color.White.copy(alpha = 0.7f)
@@ -374,14 +374,25 @@ fun isUpdateAvailable(moduleName: String, installedVersion: String?, latestVersi
 fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: String): Intent? {
     return when (packageName) {
         "com.samsung.android.app.clockface" -> {
-            Log.d("BadlockLaunch", "Clockface: Redirecting to WallpaperSettingActivity.")
-            return Intent().apply {
-                component = ComponentName(
-                    "com.samsung.android.app.dressroom",
-                    "com.samsung.android.app.dressroom.presentation.settings.WallpaperSettingActivity"
-                )
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            Log.d("BadlockLaunch", "Clockface: trying launch intents.")
+            val attempts = listOf(
+                Intent().apply {
+                    component = ComponentName(
+                        "com.samsung.android.app.clockface",
+                        "com.samsung.android.app.clockface.ClockfaceActivity"
+                    )
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+                Intent().apply {
+                    component = ComponentName(
+                        "com.samsung.android.app.dressroom",
+                        "com.samsung.android.app.dressroom.presentation.settings.WallpaperSettingActivity"
+                    )
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                },
+                Intent("android.settings.DISPLAY_SETTINGS")
+            )
+            attempts.firstOrNull { context.packageManager.resolveActivity(it, 0) != null }
         }
         "com.samsung.systemui.lockstar" -> {
             val settingsLockIntent = Intent().apply {
@@ -1026,7 +1037,7 @@ fun ModuleCard(
                     if (module.isUpdateAvailable) {
                         Button(
                             onClick = onUpdateClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = UpdateOlive, contentColor = Color(0xFF8FAA55)),
+                            colors = ButtonDefaults.buttonColors(containerColor = UpdateOlive, contentColor = Color.White),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                             modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
@@ -1034,7 +1045,7 @@ fun ModuleCard(
                     }
                     Button(
                         onClick = onOpenClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A3A), contentColor = Color(0xFFAAAAAA)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A3A), contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
@@ -1042,7 +1053,7 @@ fun ModuleCard(
                 } else {
                     Button(
                         onClick = onWebsiteClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A1F4E), contentColor = Color(0xFF8899CC)),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A1F4E), contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
@@ -1062,7 +1073,7 @@ fun VersionInfo(module: InstalledModule) {
     Text(versionText, color = TextSecondary, fontSize = 12.sp, maxLines = 1)
 
     if (module.latestVersion != null) {
-        val color = if (module.isUpdateAvailable) UpdateLatestRed else TextSecondary
+        val color = if (module.isUpdateAvailable) UpdateLatestAmber else TextSecondary
         Text("Latest: v${module.latestVersion}", color = color, fontSize = 12.sp, maxLines = 1)
 
         val minVersionText = if (!module.minAndroidVersion.isNullOrBlank()) {
