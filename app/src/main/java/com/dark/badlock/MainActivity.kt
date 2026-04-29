@@ -1,7 +1,6 @@
 package com.dark.badlock
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
@@ -33,7 +32,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
@@ -79,7 +77,7 @@ val PrimaryAccent = Color(0xFF8A2BE2) // Electric Blue-Violet
 val TabActiveDarkPurple = Color(0xFF2D1B4E) // Dark purple for active tab button
 val GreenAccent = Color(0xFF00FFA3) // Neon Mint
 val InstallBlue = Color(0xFF0A3D91) // Dark Blue
-val UpdateOlive = Color(0xFF6B7C2D) // Olive green for update button
+val UpdateOlive = Color(0xFF2A3010) // Dark muted olive for update button
 val UpdateLatestRed = Color(0xFF8B0000) // Dark red for "Latest" text on update
 val UpdateYellow = Color(0xFFFFD600) // Vibrant Yellow
 val TextPrimary = Color.White.copy(alpha = 0.9f)
@@ -662,22 +660,7 @@ fun launchModule(context: Context, module: InstalledModule) {
     try {
         module.launchIntent?.let { intent ->
             Log.d("BadlockLaunch", "Launching ${module.name} with intent: ${intent.component}")
-            if (module.packageName == "com.samsung.android.app.clockface") {
-                AlertDialog.Builder(context)
-                    .setTitle("Clockface Instructions (Developer's Note)")
-                    .setMessage(
-                        "To find your Clockface styles, you need to navigate to the lock screen editor manually.(Because the developer couldn't find a way to open it, What a dumb ahh right?)\n\n" +
-                                "1. Go to Settings > Wallpaper and style.\n" +
-                                "2. Tap the 'Lock screen' preview.\n" +
-                                "3. Tap on the clock and go to Styles.\n"+
-                                "4.You can find your various clockfaces there.\n\n"+
-                                "If you already have Lockstar open that module and click on clock this is way faster."
-                    )
-                    .setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
-                    .show()
-            } else {
-                context.startActivity(intent)
-            }
+            context.startActivity(intent)
         } ?: run {
             Log.w("BadlockLaunch", "No launch intent available for ${module.name}")
             val message = "${module.name} needs to be configured from Samsung Settings"
@@ -1010,16 +993,16 @@ fun ModuleCard(
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF2C2C2C)),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onModuleClick)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onAppInfoClick)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
-                    .background(DarkBackground),
+                    .background(Color(0xFF1C1C1C)),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
@@ -1034,47 +1017,40 @@ fun ModuleCard(
                 Spacer(Modifier.height(4.dp))
                 VersionInfo(module)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Button column: stacks Update + Open when update available, or just Open/Install
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (module.isInstalled) {
-                        if (module.isUpdateAvailable) {
-                            Button(
-                                onClick = onUpdateClick,
-                                colors = ButtonDefaults.buttonColors(containerColor = UpdateOlive, contentColor = Color.White),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                modifier = Modifier.height(32.dp)
-                            ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
-                        }
-                        Button(
-                            onClick = onOpenClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A5A), contentColor = Color.White),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) { Text("Open", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
-                    } else {
-                        Button(
-                            onClick = onWebsiteClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = InstallBlue, contentColor = Color.White),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
-                    }
-                }
-                IconButton(onClick = onWebsiteClick) {
-                    Icon(Icons.Default.Public, contentDescription = "Go to Website", tint = TextSecondary)
-                }
+            Spacer(Modifier.width(8.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 if (module.isInstalled) {
-                    IconButton(onClick = onAppInfoClick) {
-                        Icon(Icons.Default.Info, contentDescription = "App Info", tint = TextSecondary)
+                    if (module.isUpdateAvailable) {
+                        Button(
+                            onClick = onUpdateClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = UpdateOlive, contentColor = Color(0xFF8FAA55)),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                            modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
+                        ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                     }
+                    Button(
+                        onClick = onOpenClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A3A), contentColor = Color(0xFFAAAAAA)),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                        modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
+                    ) { Text("Open", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                } else {
+                    Button(
+                        onClick = onWebsiteClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0A1F4E), contentColor = Color(0xFF8899CC)),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                        modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
+                    ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                 }
+            }
+            IconButton(onClick = onWebsiteClick) {
+                Icon(Icons.Default.Public, contentDescription = "Go to Website", tint = TextSecondary.copy(alpha = 0.5f))
             }
         }
     }
