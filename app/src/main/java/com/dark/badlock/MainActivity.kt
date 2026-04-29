@@ -789,19 +789,11 @@ fun MainScreen(cacheManager: CacheManager) {
     val onAppInfoClick = remember<(String) -> Unit> {
         { packageName -> openAppInfo(context, packageName) }
     }
+    val onOpenClick = remember<(InstalledModule) -> Unit> {
+        { module -> launchModule(context, module) }
+    }
 
     Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Cool-Lock", fontWeight = FontWeight.Bold, color = TextPrimary) },
-                actions = {
-                    IconButton(onClick = { refreshData(force = true) }, enabled = moduleState != ModuleState.Loading) {
-                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh", tint = TextSecondary)
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
-            )
-        },
         containerColor = DarkBackground
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
@@ -839,7 +831,8 @@ fun MainScreen(cacheManager: CacheManager) {
                                     onModuleClick = onModuleClick,
                                     onWebsiteClick = onWebsiteClick,
                                     onUpdateClick = onUpdateClick,
-                                    onAppInfoClick = onAppInfoClick
+                                    onAppInfoClick = onAppInfoClick,
+                                    onOpenClick = onOpenClick
                                 )
                             }
                             // Gradient scrim + floating pill tab bar
@@ -919,13 +912,43 @@ fun MainScreen(cacheManager: CacheManager) {
                                             } else {
                                                 Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
                                             }
-                                            if (isSelected) {
-                                                Spacer(Modifier.width(7.dp))
-                                                Text(title, fontWeight = FontWeight.SemiBold, color = Color.White, fontSize = 13.sp)
-                                            }
+                                            Spacer(Modifier.width(7.dp))
+                                            Text(
+                                                title,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                color = if (isSelected) Color.White else TextSecondary,
+                                                fontSize = 13.sp
+                                            )
                                         }
                                     }
                                 }
+                            }
+                        }
+
+                        // Title + Refresh bar below the pill
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(DarkBackground)
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Cool-Lock",
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                fontSize = 20.sp
+                            )
+                            IconButton(
+                                onClick = { refreshData(force = true) },
+                                enabled = moduleState != ModuleState.Loading
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Refresh",
+                                    tint = TextSecondary
+                                )
                             }
                         }
                     }
@@ -942,7 +965,8 @@ fun ModuleList(
     onModuleClick: (InstalledModule) -> Unit,
     onWebsiteClick: (String) -> Unit,
     onUpdateClick: (InstalledModule) -> Unit,
-    onAppInfoClick: (String) -> Unit
+    onAppInfoClick: (String) -> Unit,
+    onOpenClick: (InstalledModule) -> Unit
 ) {
     if (modules.isEmpty() && showEmptyMessage) {
         Column(
@@ -967,7 +991,8 @@ fun ModuleList(
                     onModuleClick = { onModuleClick(module) },
                     onWebsiteClick = { onWebsiteClick(module.apkMirrorMainPage) },
                     onUpdateClick = { onUpdateClick(module) },
-                    onAppInfoClick = { onAppInfoClick(module.packageName) }
+                    onAppInfoClick = { onAppInfoClick(module.packageName) },
+                    onOpenClick = { onOpenClick(module) }
                 )
             }
         }
@@ -980,7 +1005,8 @@ fun ModuleCard(
     onModuleClick: () -> Unit,
     onWebsiteClick: () -> Unit,
     onUpdateClick: () -> Unit,
-    onAppInfoClick: () -> Unit
+    onAppInfoClick: () -> Unit,
+    onOpenClick: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -1009,22 +1035,37 @@ fun ModuleCard(
                 VersionInfo(module)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (module.isInstalled) {
-                    if (module.isUpdateAvailable) {
+                // Button column: stacks Update + Open when update available, or just Open/Install
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (module.isInstalled) {
+                        if (module.isUpdateAvailable) {
+                            Button(
+                                onClick = onUpdateClick,
+                                colors = ButtonDefaults.buttonColors(containerColor = UpdateOlive, contentColor = Color.White),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                modifier = Modifier.height(32.dp)
+                            ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                        }
                         Button(
-                            onClick = onUpdateClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = UpdateOlive, contentColor = Color.White),
+                            onClick = onOpenClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2A2A5A), contentColor = Color.White),
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp)
-                        ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) { Text("Open", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                    } else {
+                        Button(
+                            onClick = onWebsiteClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = InstallBlue, contentColor = Color.White),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
                     }
-                } else {
-                    Button(
-                        onClick = onWebsiteClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = InstallBlue, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp)
-                    ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
                 }
                 IconButton(onClick = onWebsiteClick) {
                     Icon(Icons.Default.Public, contentDescription = "Go to Website", tint = TextSecondary)
