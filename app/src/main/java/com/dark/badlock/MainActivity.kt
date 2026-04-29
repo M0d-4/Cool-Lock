@@ -85,6 +85,7 @@ data class AppColors(
     val openButtonBg: Color,
     val installButtonBg: Color,
     val updateButtonBg: Color,
+    val buttonTextColor: Color,
     val updateLatestText: Color,
     val websiteIconTint: Color,
     val titleBarBackground: Color,
@@ -106,6 +107,7 @@ val DarkAppColors = AppColors(
     openButtonBg      = Color(0xFF1A1A3A),
     installButtonBg   = Color(0xFF0A1F4E),
     updateButtonBg    = Color(0xFF2A3010),
+    buttonTextColor   = Color.White,
     updateLatestText  = Color(0xFFB8860B),
     websiteIconTint   = Color.White.copy(alpha = 0.35f),
     titleBarBackground= Color(0xFF000000),
@@ -127,6 +129,7 @@ val LightAppColors = AppColors(
     openButtonBg      = Color(0xFFDDDDF0),
     installButtonBg   = Color(0xFFD0E0FF),
     updateButtonBg    = Color(0xFFE8F0C8),
+    buttonTextColor   = Color.Black,
     updateLatestText  = Color(0xFF8B6914),
     websiteIconTint   = Color(0xFF6C6C70),
     titleBarBackground= Color(0xFFF2F2F7),
@@ -438,26 +441,38 @@ fun isUpdateAvailable(moduleName: String, installedVersion: String?, latestVersi
 fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: String): Intent? {
     return when (packageName) {
         "com.samsung.android.app.clockface" -> {
-            Log.d("BadlockLaunch", "Clockface: trying launch intents.")
-            // Try Clockface's own exported activities first
-            val clockfaceActivities = listOf(
-                "com.samsung.android.app.clockface.ClockfaceActivity",
-                "com.samsung.android.app.clockface.MainActivity",
-                "com.samsung.android.app.clockface.presentation.ClockfaceActivity"
-            )
-            val direct = findWorkingActivity(context, packageName, clockfaceActivities)
-            if (direct != null) return direct
+            Log.d("BadlockLaunch", "Clockface: enumerating package activities.")
+            try {
+                val pkgInfo = context.packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.GET_ACTIVITIES
+                )
+                val activities = pkgInfo.activities ?: emptyArray()
+                Log.d("BadlockLaunch", "Clockface has ${activities.size} activities: ${activities.map { it.name }}")
 
-            // Try deep search within the Clockface package
-            val deep = findBestActivityDeepSearch(context, packageName, moduleName)
-            if (deep != null) return deep
+                // Prefer any activity whose name suggests it's the main UI
+                val preferred = activities.firstOrNull { a ->
+                    val n = a.name.lowercase()
+                    n.contains("main") || n.contains("clockface") || n.contains("home")
+                } ?: activities.firstOrNull { a ->
+                    // fallback: anything not a service/helper/about
+                    val n = a.name.lowercase()
+                    !n.contains("splash") && !n.contains("about") && !n.contains("widget")
+                } ?: activities.firstOrNull()
 
-            // Launch Good Lock itself as last resort so the user can navigate manually
-            val goodLock = context.packageManager.getLaunchIntentForPackage("com.samsung.android.goodlock")
-                ?: context.packageManager.getLaunchIntentForPackage("com.lge.launcher3")
-            if (goodLock != null) return goodLock.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                if (preferred != null) {
+                    return Intent().apply {
+                        component = ComponentName(packageName, preferred.name)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("BadlockLaunch", "Clockface package enumeration failed", e)
+            }
 
-            null
+            // Last resort: open Good Lock so user can navigate manually
+            context.packageManager.getLaunchIntentForPackage("com.samsung.android.goodlock")
+                ?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
         }
         "com.samsung.systemui.lockstar" -> {
             val settingsLockIntent = Intent().apply {
@@ -1102,7 +1117,7 @@ fun ModuleCard(
                     if (module.isUpdateAvailable) {
                         Button(
                             onClick = onUpdateClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = appColors.updateButtonBg, contentColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = appColors.updateButtonBg, contentColor = appColors.buttonTextColor),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                             modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
@@ -1110,7 +1125,7 @@ fun ModuleCard(
                     }
                     Button(
                         onClick = onOpenClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = appColors.openButtonBg, contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = appColors.openButtonBg, contentColor = appColors.buttonTextColor),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
@@ -1118,7 +1133,7 @@ fun ModuleCard(
                 } else {
                     Button(
                         onClick = onWebsiteClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = appColors.installButtonBg, contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = appColors.installButtonBg, contentColor = appColors.buttonTextColor),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
