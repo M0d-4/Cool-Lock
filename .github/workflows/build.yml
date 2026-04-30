@@ -3,21 +3,19 @@ name: Build & Release
 on:
   push:
     branches: [ main, master ]
-    tags: [ 'v*.*.*' ]
+    paths:
+      - 'app/src/**'
+      - 'app/build.gradle.kts'
+      - 'build.gradle.kts'
+      - 'gradle/libs.versions.toml'
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
     inputs:
-      create_release:
-        description: 'Create a GitHub Release with this version tag?'
-        required: true
-        type: boolean
-        default: false
       version_tag:
-        description: 'Version tag to create (e.g. v1.3.0) — only used if Create Release is checked'
-        required: false
+        description: 'Version tag for the release (e.g. v1.3.0)'
+        required: true
         type: string
-        default: ''
 
 jobs:
   build:
@@ -33,7 +31,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create and push version tag
-        if: github.event_name == 'workflow_dispatch' && inputs.create_release == true && inputs.version_tag != ''
+        if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -110,11 +108,12 @@ jobs:
             app/build/outputs/apk/release/app-release-signed.apk
           retention-days: 30
 
-  release:
-    name: Create GitHub Release
+  # Beta release: triggered automatically on push when source files change
+  beta_release:
+    name: Publish Beta Release
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release == true && inputs.version_tag != '')
+    if: github.event_name == 'push'
     permissions:
       contents: write
 
@@ -124,14 +123,71 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine tag name
-        id: tag
+      - name: Download release APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Cool-Lock-release-${{ github.sha }}
+          path: apk/release
+
+      - name: Download debug APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Cool-Lock-debug-${{ github.sha }}
+          path: apk/debug
+
+      - name: Determine beta tag
+        id: beta_tag
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "name=${{ inputs.version_tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          echo "name=beta-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Delete existing beta tag/release if present
+        run: |
+          TAG="${{ steps.beta_tag.outputs.name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rename APKs with beta tag
+        run: |
+          TAG="${{ steps.beta_tag.outputs.name }}"
+          mv apk/release/app-release-signed.apk apk/release/Cool-Lock-${TAG}.apk 2>/dev/null || \
+          mv apk/release/app-release-unsigned.apk apk/release/Cool-Lock-${TAG}.apk
+          mv apk/debug/app-debug.apk apk/debug/Cool-Lock-${TAG}-debug.apk
+
+      - name: Create Beta GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.beta_tag.outputs.name }}
+          name: "Cool-Lock Beta (${{ steps.beta_tag.outputs.name }})"
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            Beta build - automatically published on source change.
+            Commit: ${{ github.sha }}
+          files: |
+            apk/release/Cool-Lock-${{ steps.beta_tag.outputs.name }}.apk
+            apk/debug/Cool-Lock-${{ steps.beta_tag.outputs.name }}-debug.apk
+
+  # Stable release: triggered only via manual workflow_dispatch
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download release APK artifact
         uses: actions/download-artifact@v4
@@ -147,18 +203,19 @@ jobs:
 
       - name: Rename APKs with version
         run: |
-          TAG="${{ steps.tag.outputs.name }}"
-          mv apk/release/app-release-signed.apk   apk/release/Cool-Lock-${TAG}.apk
+          TAG="${{ inputs.version_tag }}"
+          mv apk/release/app-release-signed.apk   apk/release/Cool-Lock-${TAG}.apk 2>/dev/null || \
+          mv apk/release/app-release-unsigned.apk apk/release/Cool-Lock-${TAG}.apk
           mv apk/debug/app-debug.apk              apk/debug/Cool-Lock-${TAG}-debug.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          name: Cool-Lock ${{ steps.tag.outputs.name }}
+          tag_name: ${{ inputs.version_tag }}
+          name: Cool-Lock ${{ inputs.version_tag }}
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
-            apk/release/Cool-Lock-${{ steps.tag.outputs.name }}.apk
-            apk/debug/Cool-Lock-${{ steps.tag.outputs.name }}-debug.apk
+            apk/release/Cool-Lock-${{ inputs.version_tag }}.apk
+            apk/debug/Cool-Lock-${{ inputs.version_tag }}-debug.apk
