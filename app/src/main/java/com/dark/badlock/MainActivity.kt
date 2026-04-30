@@ -441,36 +441,34 @@ fun isUpdateAvailable(moduleName: String, installedVersion: String?, latestVersi
 fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: String): Intent? {
     return when (packageName) {
         "com.samsung.android.app.clockface" -> {
-            Log.d("BadlockLaunch", "Clockface: enumerating package activities.")
-            try {
-                val pkgInfo = context.packageManager.getPackageInfo(
-                    packageName,
-                    PackageManager.GET_ACTIVITIES
-                )
-                val activities = pkgInfo.activities ?: emptyArray()
-                Log.d("BadlockLaunch", "Clockface has ${activities.size} activities: ${activities.map { it.name }}")
+            Log.d("BadlockLaunch", "Clockface: trying Good Lock plugin launch.")
 
-                // Prefer any activity whose name suggests it's the main UI
-                val preferred = activities.firstOrNull { a ->
-                    val n = a.name.lowercase()
-                    n.contains("main") || n.contains("clockface") || n.contains("home")
-                } ?: activities.firstOrNull { a ->
-                    // fallback: anything not a service/helper/about
-                    val n = a.name.lowercase()
-                    !n.contains("splash") && !n.contains("about") && !n.contains("widget")
-                } ?: activities.firstOrNull()
-
-                if (preferred != null) {
-                    return Intent().apply {
-                        component = ComponentName(packageName, preferred.name)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("BadlockLaunch", "Clockface package enumeration failed", e)
+            // Good Lock plugin launch — this is how Samsung's own app opens sub-modules
+            val goodLockPluginIntent = Intent("com.samsung.android.goodlock.intent.action.LAUNCH_PLUGIN").apply {
+                `package` = "com.samsung.android.goodlock"
+                putExtra("packageName", "com.samsung.android.app.clockface")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (context.packageManager.resolveActivity(goodLockPluginIntent, 0) != null) {
+                Log.d("BadlockLaunch", "Clockface: using Good Lock plugin intent.")
+                return goodLockPluginIntent
             }
 
-            // Last resort: open Good Lock so user can navigate manually
+            // Fallback: try known deep-link activity names directly
+            val knownActivities = listOf(
+                "com.samsung.android.app.clockface.ui.MainActivity",
+                "com.samsung.android.app.clockface.ClockfaceActivity",
+                "com.samsung.android.app.clockface.ui.ClockfaceActivity",
+                "com.samsung.android.app.clockface.presentation.ui.MainActivity"
+            )
+            val directIntent = findWorkingActivity(context, packageName, knownActivities)
+            if (directIntent != null) {
+                Log.d("BadlockLaunch", "Clockface: found direct activity.")
+                return directIntent
+            }
+
+            // Last resort: open Good Lock so the user can navigate manually
+            Log.w("BadlockLaunch", "Clockface: falling back to Good Lock home.")
             context.packageManager.getLaunchIntentForPackage("com.samsung.android.goodlock")
                 ?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
         }
@@ -1092,7 +1090,7 @@ fun ModuleCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
+                modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape)
                     .background(appColors.iconBox),
                 contentAlignment = Alignment.Center
             ) {
@@ -1149,8 +1147,14 @@ fun ModuleCard(
 
 @Composable
 fun VersionInfo(module: InstalledModule) {
-    val versionText = if (module.isInstalled) "v${module.versionName ?: "N/A"}" else "Not Installed"
-    Text(versionText, color = appColors.textSecondary, fontSize = 12.sp, maxLines = 1)
+    if (module.isInstalled) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Current: ", color = appColors.textSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text("v${module.versionName ?: "N/A"}", color = appColors.textSecondary, fontSize = 12.sp, maxLines = 1)
+        }
+    } else {
+        Text("Not Installed", color = appColors.textSecondary, fontSize = 12.sp, maxLines = 1)
+    }
 
     if (module.latestVersion != null) {
         val color = if (module.isUpdateAvailable) appColors.updateLatestText else appColors.textSecondary
