@@ -444,29 +444,25 @@ fun isUpdateAvailable(moduleName: String, installedVersion: String?, latestVersi
 fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: String): Intent? {
     return when (packageName) {
         "com.samsung.android.app.clockface" -> {
-            Log.d("BadlockLaunch", "Clockface: attempting direct activity launch.")
-
-            // Known main activity class names across different Clockface/One UI versions.
-            // We skip getLaunchIntentForPackage because Clockface's registered launcher
-            // activity is a trampoline that Samsung restricts to Good Lock's own process.
-            val knownActivities = listOf(
-                "com.samsung.android.app.clockface.ui.MainActivity",
-                "com.samsung.android.app.clockface.presentation.ui.MainActivity",
-                "com.samsung.android.app.clockface.ClockfaceActivity",
-                "com.samsung.android.app.clockface.ui.ClockfaceActivity",
-                "com.samsung.android.app.clockface.ui.ClockFaceActivity"
-            )
-            val directIntent = findWorkingActivity(context, packageName, knownActivities)
-            if (directIntent != null) {
-                Log.d("BadlockLaunch", "Clockface: found direct activity.")
-                return directIntent.apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                }
+            // Clockface has no standard launcher activity. Its only exported entry point
+            // is ClockFaceSelectSetting, reachable via its custom action.
+            val intent = Intent("com.samsung.android.app.clockface.action.ClockFaceSelectSetting").apply {
+                `package` = "com.samsung.android.app.clockface"
+                addCategory(Intent.CATEGORY_DEFAULT)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-
-            // Enumerate all exported activities and score them
-            Log.w("BadlockLaunch", "Clockface: falling back to deep activity search.")
-            findBestActivityDeepSearch(context, packageName, "Clockface")
+            if (context.packageManager.resolveActivity(intent, 0) != null) {
+                Log.d("BadlockLaunch", "Clockface: launching via ClockFaceSelectSetting action.")
+                return intent
+            }
+            // Fallback: target the activity class directly
+            Intent().apply {
+                component = ComponentName(
+                    "com.samsung.android.app.clockface",
+                    "com.samsung.android.app.clockface.setting.ClockFaceSelectSetting"
+                )
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
         }
         "com.samsung.systemui.lockstar" -> {
             val settingsLockIntent = Intent().apply {
