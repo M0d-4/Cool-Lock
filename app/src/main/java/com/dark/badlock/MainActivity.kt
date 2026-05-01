@@ -444,15 +444,10 @@ fun isUpdateAvailable(moduleName: String, installedVersion: String?, latestVersi
 fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: String): Intent? {
     return when (packageName) {
         "com.samsung.android.app.clockface" -> {
-            // Clockface has no standard launcher activity. Its only exported entry point
-            // is ClockFaceSelectSetting, reachable via its custom action.
-            // We skip resolveActivity() — it returns null due to package visibility on Android 11+
-            // even when the intent works fine. Build the intent directly and let startActivity handle it.
-            Intent("com.samsung.android.app.clockface.action.ClockFaceSelectSetting").apply {
-                `package` = "com.samsung.android.app.clockface"
-                addCategory(Intent.CATEGORY_DEFAULT)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+            // ClockFaceSelectSetting requires WRITE_SECURE_SETTINGS, which cannot be granted
+            // to third-party apps on One UI. Open Good Lock instead so the user can navigate there.
+            context.packageManager.getLaunchIntentForPackage("com.samsung.android.goodlock")
+                ?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
         }
         "com.samsung.systemui.lockstar" -> {
             val settingsLockIntent = Intent().apply {
@@ -732,6 +727,9 @@ fun launchModule(context: Context, module: InstalledModule) {
         val intent = getBestLaunchIntent(context, module.packageName, module.name)
             ?: module.launchIntent
         intent?.let {
+            if (module.packageName == "com.samsung.android.app.clockface") {
+                Toast.makeText(context, "Opening Good Lock — tap Clockface from there", Toast.LENGTH_LONG).show()
+            }
             Log.d("BadlockLaunch", "Launching ${module.name} with intent: ${it.action} / ${it.component}")
             context.startActivity(it)
         } ?: run {
