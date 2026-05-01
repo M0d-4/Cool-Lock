@@ -1145,9 +1145,10 @@ fun ModuleCard(
 @Composable
 fun VersionInfo(module: InstalledModule) {
     if (module.isInstalled) {
+        val currentColor = if (module.isUpdateAvailable) appColors.currentVersionText else appColors.textSecondary
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Current: ", color = appColors.currentVersionText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text("v${module.versionName ?: "N/A"}", color = appColors.currentVersionText.copy(alpha = 0.85f), fontSize = 12.sp, maxLines = 1)
+            Text("Current: ", color = currentColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("v${module.versionName ?: "N/A"}", color = currentColor.copy(alpha = 0.85f), fontSize = 12.sp, maxLines = 1)
         }
     } else {
         Text("Not Installed", color = appColors.textSecondary, fontSize = 12.sp, maxLines = 1)
