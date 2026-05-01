@@ -87,6 +87,7 @@ data class AppColors(
     val updateButtonBg: Color,
     val buttonTextColor: Color,
     val updateLatestText: Color,
+    val currentVersionText: Color,
     val websiteIconTint: Color,
     val titleBarBackground: Color,
     val accentPrimary: Color,
@@ -109,6 +110,7 @@ val DarkAppColors = AppColors(
     updateButtonBg    = Color(0xFF2A3010),
     buttonTextColor   = Color.White,
     updateLatestText  = Color(0xFFB8860B),
+    currentVersionText= Color(0xFF64B5F6),
     websiteIconTint   = Color.White.copy(alpha = 0.35f),
     titleBarBackground= Color(0xFF000000),
     accentPrimary     = Color(0xFF8A2BE2),
@@ -131,6 +133,7 @@ val LightAppColors = AppColors(
     updateButtonBg    = Color(0xFFE8F0C8),
     buttonTextColor   = Color.Black,
     updateLatestText  = Color(0xFF8B6914),
+    currentVersionText= Color(0xFF1565C0),
     websiteIconTint   = Color(0xFF6C6C70),
     titleBarBackground= Color(0xFFF2F2F7),
     accentPrimary     = Color(0xFF6B3FA0),
@@ -441,38 +444,29 @@ fun isUpdateAvailable(moduleName: String, installedVersion: String?, latestVersi
 fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: String): Intent? {
     return when (packageName) {
         "com.samsung.android.app.clockface" -> {
-            Log.d("BadlockLaunch", "Clockface: enumerating package activities.")
-            try {
-                val pkgInfo = context.packageManager.getPackageInfo(
-                    packageName,
-                    PackageManager.GET_ACTIVITIES
-                )
-                val activities = pkgInfo.activities ?: emptyArray()
-                Log.d("BadlockLaunch", "Clockface has ${activities.size} activities: ${activities.map { it.name }}")
+            Log.d("BadlockLaunch", "Clockface: attempting direct activity launch.")
 
-                // Prefer any activity whose name suggests it's the main UI
-                val preferred = activities.firstOrNull { a ->
-                    val n = a.name.lowercase()
-                    n.contains("main") || n.contains("clockface") || n.contains("home")
-                } ?: activities.firstOrNull { a ->
-                    // fallback: anything not a service/helper/about
-                    val n = a.name.lowercase()
-                    !n.contains("splash") && !n.contains("about") && !n.contains("widget")
-                } ?: activities.firstOrNull()
-
-                if (preferred != null) {
-                    return Intent().apply {
-                        component = ComponentName(packageName, preferred.name)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
+            // Known main activity class names across different Clockface/One UI versions.
+            // We skip getLaunchIntentForPackage because Clockface's registered launcher
+            // activity is a trampoline that Samsung restricts to Good Lock's own process.
+            val knownActivities = listOf(
+                "com.samsung.android.app.clockface.ui.MainActivity",
+                "com.samsung.android.app.clockface.presentation.ui.MainActivity",
+                "com.samsung.android.app.clockface.ClockfaceActivity",
+                "com.samsung.android.app.clockface.ui.ClockfaceActivity",
+                "com.samsung.android.app.clockface.ui.ClockFaceActivity"
+            )
+            val directIntent = findWorkingActivity(context, packageName, knownActivities)
+            if (directIntent != null) {
+                Log.d("BadlockLaunch", "Clockface: found direct activity.")
+                return directIntent.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                 }
-            } catch (e: Exception) {
-                Log.e("BadlockLaunch", "Clockface package enumeration failed", e)
             }
 
-            // Last resort: open Good Lock so user can navigate manually
-            context.packageManager.getLaunchIntentForPackage("com.samsung.android.goodlock")
-                ?.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+            // Enumerate all exported activities and score them
+            Log.w("BadlockLaunch", "Clockface: falling back to deep activity search.")
+            findBestActivityDeepSearch(context, packageName, "Clockface")
         }
         "com.samsung.systemui.lockstar" -> {
             val settingsLockIntent = Intent().apply {
@@ -1082,10 +1076,11 @@ fun ModuleCard(
     onAppInfoClick: () -> Unit,
     onOpenClick: () -> Unit
 ) {
+    val pillShape = RoundedCornerShape(50.dp)
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = pillShape,
         colors = CardDefaults.cardColors(containerColor = appColors.cardBackground),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onAppInfoClick)
+        modifier = Modifier.fillMaxWidth().clip(pillShape).clickable(onClick = onAppInfoClick)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -1118,7 +1113,7 @@ fun ModuleCard(
                         Button(
                             onClick = onUpdateClick,
                             colors = ButtonDefaults.buttonColors(containerColor = appColors.updateButtonBg, contentColor = appColors.buttonTextColor),
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(50.dp),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                             modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
                         ) { Text("Update", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
@@ -1126,7 +1121,7 @@ fun ModuleCard(
                     Button(
                         onClick = onOpenClick,
                         colors = ButtonDefaults.buttonColors(containerColor = appColors.openButtonBg, contentColor = appColors.buttonTextColor),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(50.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
                     ) { Text("Open", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
@@ -1134,7 +1129,7 @@ fun ModuleCard(
                     Button(
                         onClick = onWebsiteClick,
                         colors = ButtonDefaults.buttonColors(containerColor = appColors.installButtonBg, contentColor = appColors.buttonTextColor),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(50.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
                         modifier = Modifier.height(36.dp).widthIn(min = 80.dp)
                     ) { Text("Install", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
@@ -1149,8 +1144,14 @@ fun ModuleCard(
 
 @Composable
 fun VersionInfo(module: InstalledModule) {
-    val versionText = if (module.isInstalled) "v${module.versionName ?: "N/A"}" else "Not Installed"
-    Text(versionText, color = appColors.textSecondary, fontSize = 12.sp, maxLines = 1)
+    if (module.isInstalled) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Current: ", color = appColors.currentVersionText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("v${module.versionName ?: "N/A"}", color = appColors.currentVersionText.copy(alpha = 0.85f), fontSize = 12.sp, maxLines = 1)
+        }
+    } else {
+        Text("Not Installed", color = appColors.textSecondary, fontSize = 12.sp, maxLines = 1)
+    }
 
     if (module.latestVersion != null) {
         val color = if (module.isUpdateAvailable) appColors.updateLatestText else appColors.textSecondary
