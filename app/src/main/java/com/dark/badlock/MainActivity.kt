@@ -446,21 +446,11 @@ fun getSpecialLaunchIntent(context: Context, packageName: String, moduleName: St
         "com.samsung.android.app.clockface" -> {
             // Clockface has no standard launcher activity. Its only exported entry point
             // is ClockFaceSelectSetting, reachable via its custom action.
-            val intent = Intent("com.samsung.android.app.clockface.action.ClockFaceSelectSetting").apply {
+            // We skip resolveActivity() — it returns null due to package visibility on Android 11+
+            // even when the intent works fine. Build the intent directly and let startActivity handle it.
+            Intent("com.samsung.android.app.clockface.action.ClockFaceSelectSetting").apply {
                 `package` = "com.samsung.android.app.clockface"
                 addCategory(Intent.CATEGORY_DEFAULT)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (context.packageManager.resolveActivity(intent, 0) != null) {
-                Log.d("BadlockLaunch", "Clockface: launching via ClockFaceSelectSetting action.")
-                return intent
-            }
-            // Fallback: target the activity class directly
-            Intent().apply {
-                component = ComponentName(
-                    "com.samsung.android.app.clockface",
-                    "com.samsung.android.app.clockface.setting.ClockFaceSelectSetting"
-                )
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
         }
@@ -739,9 +729,11 @@ fun openRelevantSettings(context: Context, packageName: String) {
 
 fun launchModule(context: Context, module: InstalledModule) {
     try {
-        module.launchIntent?.let { intent ->
-            Log.d("BadlockLaunch", "Launching ${module.name} with intent: ${intent.component}")
-            context.startActivity(intent)
+        val intent = getBestLaunchIntent(context, module.packageName, module.name)
+            ?: module.launchIntent
+        intent?.let {
+            Log.d("BadlockLaunch", "Launching ${module.name} with intent: ${it.action} / ${it.component}")
+            context.startActivity(it)
         } ?: run {
             Log.w("BadlockLaunch", "No launch intent available for ${module.name}")
             val message = "${module.name} needs to be configured from Samsung Settings"
