@@ -915,12 +915,9 @@ fun MainScreen(cacheManager: CacheManager) {
                                             )
                                         )
                                 )
-                                // Measure tab positions then draw a sliding blurred selector behind them
-                                val tabCount = tabs.size
-                                var barWidth by remember { mutableStateOf(0) }
+                                val selectedIndex = pagerState.currentPage
                                 var tabWidth by remember { mutableStateOf(0) }
 
-                                val selectedIndex = pagerState.currentPage
                                 val selectorOffsetFraction by animateFloatAsState(
                                     targetValue = selectedIndex.toFloat(),
                                     animationSpec = spring(
@@ -933,35 +930,23 @@ fun MainScreen(cacheManager: CacheManager) {
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
-                                        .padding(horizontal = 24.dp, vertical = 4.dp)
+                                        .padding(horizontal = 16.dp, vertical = 4.dp)
                                         .clip(RoundedCornerShape(50.dp))
                                         .background(appColors.pillBarBg)
-                                        .onGloballyPositioned { barWidth = it.size.width }
                                 ) {
-                                    // Blurred sliding selector
+                                    // Sliding pill selector — drawn inside the clipped Box so no bleed
                                     if (tabWidth > 0) {
-                                        val offsetPx = selectorOffsetFraction * tabWidth
+                                        val density = androidx.compose.ui.platform.LocalDensity.current
+                                        val offsetDp = with(density) { (selectorOffsetFraction * tabWidth).toDp() }
                                         Box(
                                             modifier = Modifier
-                                                .offset(x = with(androidx.compose.ui.platform.LocalDensity.current) { offsetPx.toDp() } + 6.dp, y = 6.dp)
+                                                .offset(x = offsetDp + 6.dp, y = 6.dp)
                                                 .size(
-                                                    width = with(androidx.compose.ui.platform.LocalDensity.current) { tabWidth.toDp() } - 12.dp,
+                                                    width = with(density) { tabWidth.toDp() } - 12.dp,
                                                     height = 58.dp
                                                 )
-                                                .blur(18.dp, edgeTreatment = androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded)
                                                 .clip(RoundedCornerShape(50.dp))
                                                 .background(appColors.tabActive)
-                                        )
-                                        // Sharp selector on top of blur for crisp pill shape
-                                        Box(
-                                            modifier = Modifier
-                                                .offset(x = with(androidx.compose.ui.platform.LocalDensity.current) { offsetPx.toDp() } + 6.dp, y = 6.dp)
-                                                .size(
-                                                    width = with(androidx.compose.ui.platform.LocalDensity.current) { tabWidth.toDp() } - 12.dp,
-                                                    height = 58.dp
-                                                )
-                                                .clip(RoundedCornerShape(50.dp))
-                                                .background(appColors.tabActive.copy(alpha = 0.55f))
                                         )
                                     }
 
@@ -985,7 +970,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                                 modifier = Modifier
                                                     .onGloballyPositioned { tabWidth = it.size.width }
                                                     .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                                                    .padding(horizontal = 22.dp, vertical = 8.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally,
                                                 verticalArrangement = Arrangement.Center
                                             ) {
