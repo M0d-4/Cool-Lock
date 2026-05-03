@@ -914,12 +914,11 @@ fun MainScreen(cacheManager: CacheManager) {
                                 )
                                 Row(
                                     modifier = Modifier
-                                        .fillMaxWidth()
                                         .align(Alignment.BottomCenter)
-                                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                                        .padding(horizontal = 32.dp, vertical = 4.dp)
                                         .clip(RoundedCornerShape(50.dp))
                                         .background(appColors.pillBarBg)
-                                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                                        .padding(horizontal = 6.dp, vertical = 6.dp),
                                     horizontalArrangement = Arrangement.SpaceEvenly,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -936,42 +935,36 @@ fun MainScreen(cacheManager: CacheManager) {
                                             targetValue = if (isSelected) appColors.textPrimary else appColors.textSecondary,
                                             animationSpec = tween(durationMillis = 250)
                                         )
-                                        val horizontalPad by animateDpAsState(
-                                            targetValue = if (isSelected) 18.dp else 14.dp,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessMedium
-                                            )
-                                        )
                                         val icon = when (title) {
                                             "Updates" -> Icons.Default.SystemUpdate
                                             "Make up" -> Icons.Default.Palette
                                             else -> Icons.Default.Style
                                         }
-                                        Row(
+                                        Column(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(50.dp))
                                                 .background(tabBg)
                                                 .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                                .padding(horizontal = horizontalPad, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Center
+                                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
                                         ) {
                                             if (title == "Updates" && updatableModules.isNotEmpty()) {
                                                 BadgedBox(
-                                                    badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}") } }
+                                                    badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}", fontSize = 9.sp) } }
                                                 ) {
-                                                    Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                                    Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
                                                 }
                                             } else {
-                                                Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                                Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
                                             }
-                                            Spacer(Modifier.width(7.dp))
+                                            Spacer(Modifier.height(3.dp))
                                             Text(
                                                 title,
                                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                                                 color = if (isSelected) appColors.textPrimary else appColors.textSecondary,
-                                                fontSize = 13.sp
+                                                fontSize = 11.sp,
+                                                letterSpacing = 0.sp
                                             )
                                         }
                                     }
