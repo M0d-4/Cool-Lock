@@ -43,6 +43,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -927,27 +929,35 @@ fun MainScreen(cacheManager: CacheManager) {
                                     label = "selectorOffset"
                                 )
 
+                                val selectorColor = appColors.tabActive
+
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
-                                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
                                         .clip(RoundedCornerShape(50.dp))
                                         .background(appColors.pillBarBg)
                                 ) {
-                                    // Sliding pill selector — drawn inside the clipped Box so no bleed
+                                    // Canvas draws the selector pill entirely inside the clipped Box — no bleed
                                     if (tabWidth > 0) {
                                         val density = androidx.compose.ui.platform.LocalDensity.current
-                                        val offsetDp = with(density) { (selectorOffsetFraction * tabWidth).toDp() }
-                                        Box(
+                                        val tabWidthDp = with(density) { tabWidth.toDp() }
+                                        val paddingPx = with(density) { 6.dp.toPx() }
+                                        val selectorWidthPx = with(density) { (tabWidthDp - 12.dp).toPx() }
+                                        val selectorHeightPx = with(density) { 58.dp.toPx() }
+                                        val cornerRadiusPx = selectorHeightPx / 2f
+                                        Canvas(
                                             modifier = Modifier
-                                                .offset(x = offsetDp + 6.dp, y = 6.dp)
-                                                .size(
-                                                    width = with(density) { tabWidth.toDp() } - 12.dp,
-                                                    height = 58.dp
-                                                )
-                                                .clip(RoundedCornerShape(50.dp))
-                                                .background(appColors.tabActive)
-                                        )
+                                                .matchParentSize()
+                                        ) {
+                                            val offsetX = paddingPx + selectorOffsetFraction * tabWidth
+                                            drawRoundRect(
+                                                color = selectorColor,
+                                                topLeft = androidx.compose.ui.geometry.Offset(offsetX, paddingPx),
+                                                size = androidx.compose.ui.geometry.Size(selectorWidthPx, selectorHeightPx),
+                                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadiusPx)
+                                            )
+                                        }
                                     }
 
                                     Row(
@@ -970,7 +980,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                                 modifier = Modifier
                                                     .onGloballyPositioned { tabWidth = it.size.width }
                                                     .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                                    .padding(horizontal = 22.dp, vertical = 8.dp),
+                                                    .padding(horizontal = 20.dp, vertical = 8.dp),
                                                 horizontalAlignment = Alignment.CenterHorizontally,
                                                 verticalArrangement = Arrangement.Center
                                             ) {
