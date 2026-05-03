@@ -17,7 +17,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -42,10 +41,6 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.foundation.Canvas
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -917,91 +912,67 @@ fun MainScreen(cacheManager: CacheManager) {
                                             )
                                         )
                                 )
-                                val selectedIndex = pagerState.currentPage
-                                var tabWidth by remember { mutableStateOf(0) }
-
-                                val selectorOffsetFraction by animateFloatAsState(
-                                    targetValue = selectedIndex.toFloat(),
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioLowBouncy,
-                                        stiffness = Spring.StiffnessMedium
-                                    ),
-                                    label = "selectorOffset"
-                                )
-
-                                val selectorColor = appColors.tabActive
-
-                                Box(
+                                Row(
                                     modifier = Modifier
+                                        .fillMaxWidth()
                                         .align(Alignment.BottomCenter)
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        .padding(horizontal = 16.dp, vertical = 4.dp)
                                         .clip(RoundedCornerShape(50.dp))
                                         .background(appColors.pillBarBg)
+                                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Canvas draws the selector pill entirely inside the clipped Box — no bleed
-                                    if (tabWidth > 0) {
-                                        val density = androidx.compose.ui.platform.LocalDensity.current
-                                        val tabWidthDp = with(density) { tabWidth.toDp() }
-                                        val paddingPx = with(density) { 6.dp.toPx() }
-                                        val selectorWidthPx = with(density) { (tabWidthDp - 12.dp).toPx() }
-                                        val selectorHeightPx = with(density) { 58.dp.toPx() }
-                                        val cornerRadiusPx = selectorHeightPx / 2f
-                                        Canvas(
-                                            modifier = Modifier
-                                                .matchParentSize()
-                                        ) {
-                                            val offsetX = paddingPx + selectorOffsetFraction * tabWidth
-                                            drawRoundRect(
-                                                color = selectorColor,
-                                                topLeft = androidx.compose.ui.geometry.Offset(offsetX, paddingPx),
-                                                size = androidx.compose.ui.geometry.Size(selectorWidthPx, selectorHeightPx),
-                                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadiusPx)
+                                    tabs.forEachIndexed { index, title ->
+                                        val isSelected = pagerState.currentPage == index
+                                        val tabBg by animateColorAsState(
+                                            targetValue = if (isSelected) appColors.tabActive else Color.Transparent,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMedium
                                             )
+                                        )
+                                        val iconTint by animateColorAsState(
+                                            targetValue = if (isSelected) appColors.textPrimary else appColors.textSecondary,
+                                            animationSpec = tween(durationMillis = 250)
+                                        )
+                                        val horizontalPad by animateDpAsState(
+                                            targetValue = if (isSelected) 18.dp else 14.dp,
+                                            animationSpec = spring(
+                                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                                stiffness = Spring.StiffnessMedium
+                                            )
+                                        )
+                                        val icon = when (title) {
+                                            "Updates" -> Icons.Default.SystemUpdate
+                                            "Make up" -> Icons.Default.Palette
+                                            else -> Icons.Default.Style
                                         }
-                                    }
-
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-                                        horizontalArrangement = Arrangement.SpaceEvenly,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        tabs.forEachIndexed { index, title ->
-                                            val isSelected = pagerState.currentPage == index
-                                            val iconTint by animateColorAsState(
-                                                targetValue = if (isSelected) appColors.textPrimary else appColors.textSecondary,
-                                                animationSpec = tween(durationMillis = 250)
-                                            )
-                                            val icon = when (title) {
-                                                "Updates" -> Icons.Default.SystemUpdate
-                                                "Make up" -> Icons.Default.Palette
-                                                else -> Icons.Default.Style
-                                            }
-                                            Column(
-                                                modifier = Modifier
-                                                    .onGloballyPositioned { tabWidth = it.size.width }
-                                                    .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.Center
-                                            ) {
-                                                if (title == "Updates" && updatableModules.isNotEmpty()) {
-                                                    BadgedBox(
-                                                        badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}", fontSize = 9.sp) } }
-                                                    ) {
-                                                        Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
-                                                    }
-                                                } else {
-                                                    Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
+                                        Row(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(50.dp))
+                                                .background(tabBg)
+                                                .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
+                                                .padding(horizontal = horizontalPad, vertical = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            if (title == "Updates" && updatableModules.isNotEmpty()) {
+                                                BadgedBox(
+                                                    badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}") } }
+                                                ) {
+                                                    Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
                                                 }
-                                                Spacer(Modifier.height(3.dp))
-                                                Text(
-                                                    title,
-                                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                    color = if (isSelected) appColors.textPrimary else appColors.textSecondary,
-                                                    fontSize = 11.sp,
-                                                    letterSpacing = 0.sp
-                                                )
+                                            } else {
+                                                Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
                                             }
+                                            Spacer(Modifier.width(7.dp))
+                                            Text(
+                                                title,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                color = if (isSelected) appColors.textPrimary else appColors.textSecondary,
+                                                fontSize = 13.sp
+                                            )
                                         }
                                     }
                                 }
