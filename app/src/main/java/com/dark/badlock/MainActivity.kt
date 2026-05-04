@@ -40,6 +40,8 @@ import androidx.compose.material.icons.filled.SignalWifiOff
 import androidx.compose.material.icons.filled.Style
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.*import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -75,7 +77,6 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 // --- UI THEME & COLORS ---
-// --- THEME COLORS ---
 data class AppColors(
     val background: Color,
     val surface: Color,
@@ -146,13 +147,74 @@ val LightAppColors = AppColors(
 )
 
 val LocalAppColors = staticCompositionLocalOf { DarkAppColors }
+val LocalMaterialYou = staticCompositionLocalOf { false }
 
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
     val isDark = isSystemInDarkTheme()
-    val colors = if (isDark) DarkAppColors else LightAppColors
-    CompositionLocalProvider(LocalAppColors provides colors) {
-        MaterialTheme(typography = Typography(), content = content)
+    val context = LocalContext.current
+    val useMaterialYou by remember {
+        mutableStateOf(
+            android.content.pm.PackageManager.PERMISSION_GRANTED ==
+                context.checkSelfPermission("android.permission.READ_MEDIA_IMAGES") ||
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        )
+    }
+
+    // Material You dynamic scheme (Android 12+)
+    val dynamicScheme: ColorScheme? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else null
+
+    val colors = if (dynamicScheme != null) {
+        // Derive AppColors from Material You palette
+        if (isDark) DarkAppColors.copy(
+            background        = dynamicScheme.background,
+            surface           = dynamicScheme.surface,
+            cardBackground    = dynamicScheme.surfaceVariant,
+            iconBox           = dynamicScheme.secondaryContainer,
+            tabActive         = dynamicScheme.primaryContainer,
+            tabBarBackground  = dynamicScheme.primary,
+            tabBarScrimEnd    = dynamicScheme.background,
+            pillBarBg         = dynamicScheme.background,
+            openButtonBg      = dynamicScheme.secondaryContainer,
+            installButtonBg   = dynamicScheme.tertiaryContainer,
+            updateButtonBg    = dynamicScheme.primaryContainer,
+            buttonTextColor   = dynamicScheme.onPrimaryContainer,
+            titleBarBackground= dynamicScheme.background,
+            accentPrimary     = dynamicScheme.primary,
+            badgeBg           = dynamicScheme.error,
+            currentVersionText= dynamicScheme.primary,
+            updateLatestText  = dynamicScheme.tertiary
+        ) else LightAppColors.copy(
+            background        = dynamicScheme.background,
+            surface           = dynamicScheme.surface,
+            cardBackground    = dynamicScheme.surfaceVariant,
+            iconBox           = dynamicScheme.secondaryContainer,
+            tabActive         = dynamicScheme.primaryContainer,
+            tabBarBackground  = dynamicScheme.primary,
+            tabBarScrimEnd    = dynamicScheme.background,
+            pillBarBg         = dynamicScheme.background,
+            openButtonBg      = dynamicScheme.secondaryContainer,
+            installButtonBg   = dynamicScheme.tertiaryContainer,
+            updateButtonBg    = dynamicScheme.primaryContainer,
+            buttonTextColor   = dynamicScheme.onPrimaryContainer,
+            titleBarBackground= dynamicScheme.background,
+            accentPrimary     = dynamicScheme.primary,
+            badgeBg           = dynamicScheme.error,
+            currentVersionText= dynamicScheme.primary,
+            updateLatestText  = dynamicScheme.tertiary
+        )
+    } else {
+        if (isDark) DarkAppColors else LightAppColors
+    }
+
+    val materialScheme = dynamicScheme ?: if (isDark) darkColorScheme() else lightColorScheme()
+    CompositionLocalProvider(
+        LocalAppColors provides colors,
+        LocalMaterialYou provides (dynamicScheme != null)
+    ) {
+        MaterialTheme(colorScheme = materialScheme, typography = Typography(), content = content)
     }
 }
 
@@ -900,53 +962,56 @@ fun MainScreen(cacheManager: CacheManager) {
                                     .fillMaxWidth()
                                     .align(Alignment.BottomCenter)
                             ) {
-                                // Full-width gradient scrim behind the pill
+                                // Gradient scrim
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(120.dp)
+                                        .height(100.dp)
                                         .align(Alignment.BottomCenter)
                                         .background(
                                             brush = androidx.compose.ui.graphics.Brush.verticalGradient(
                                                 colors = listOf(
                                                     Color.Transparent,
-                                                    appColors.tabBarScrimEnd.copy(alpha = 0.6f),
-                                                    appColors.tabBarScrimEnd.copy(alpha = 0.95f),
+                                                    appColors.tabBarScrimEnd.copy(alpha = 0.5f),
+                                                    appColors.tabBarScrimEnd.copy(alpha = 0.9f),
                                                     appColors.tabBarScrimEnd
                                                 )
                                             )
                                         )
                                 )
-                                val selectedIndex = pagerState.currentPage
 
-                                // Outer pill container — frosted glass effect
-                                // Layer 1: blurred colour bloom (simulates backdrop blur)
+                                val isDark = isSystemInDarkTheme()
+                                val barColor = appColors.background
+
+                                // Blur bloom layer (behind content, purely visual)
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
-                                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                                        .padding(horizontal = 6.dp, vertical = 10.dp)
                                         .clip(RoundedCornerShape(50.dp))
-                                        .blur(24.dp)
-                                        .background(appColors.pillBarBg.copy(alpha = 0.85f))
-                                        .padding(4.dp)
+                                        .blur(30.dp)
+                                        .background(barColor.copy(alpha = 0.9f))
+                                        .height(52.dp)
+                                        .fillMaxWidth(0.92f)
                                 )
-                                // Layer 2: semi-transparent foreground with content
+                                // Content layer on top
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
-                                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                                        .padding(horizontal = 6.dp, vertical = 10.dp)
                                         .clip(RoundedCornerShape(50.dp))
-                                        .background(appColors.pillBarBg.copy(alpha = 0.35f))
-                                        .padding(4.dp)
+                                        .background(barColor.copy(alpha = 0.55f))
+                                        .padding(horizontal = 4.dp, vertical = 3.dp)
                                 ) {
                                     Row(
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.fillMaxWidth(0.92f),
+                                        horizontalArrangement = Arrangement.SpaceEvenly,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         tabs.forEachIndexed { index, title ->
                                             val isSelected = pagerState.currentPage == index
                                             val iconTint by animateColorAsState(
-                                                targetValue = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f),
+                                                targetValue = if (isSelected) appColors.textPrimary else appColors.textSecondary,
                                                 animationSpec = tween(durationMillis = 200)
                                             )
                                             val icon = when (title) {
@@ -955,37 +1020,51 @@ fun MainScreen(cacheManager: CacheManager) {
                                                 else -> Icons.Default.Style
                                             }
 
-                                            // Each tab item — selected one gets blurred pill bg
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(50.dp))
-                                                    .then(if (isSelected) Modifier.blur(16.dp).background(appColors.tabActive.copy(alpha = 0.7f)) else Modifier)
-                                                    .clip(RoundedCornerShape(50.dp))
-                                                    .background(if (isSelected) appColors.tabActive.copy(alpha = 0.4f) else Color.Transparent)
-                                                    .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                                    .padding(horizontal = 22.dp, vertical = 10.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Column(
-                                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                                                ) {
-                                                    if (title == "Updates" && updatableModules.isNotEmpty()) {
-                                                        BadgedBox(
-                                                            badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}", fontSize = 9.sp) } }
-                                                        ) {
-                                                            Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
-                                                        }
-                                                    } else {
-                                                        Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
-                                                    }
-                                                    Text(
-                                                        title,
-                                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                        color = iconTint,
-                                                        fontSize = 11.sp,
-                                                        letterSpacing = 0.sp
+                                            // Selector: blur bloom behind, semi-transparent fill in front
+                                            Box(contentAlignment = Alignment.Center) {
+                                                // Blur layer for selected tab
+                                                if (isSelected) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .matchParentSize()
+                                                            .clip(RoundedCornerShape(50.dp))
+                                                            .blur(20.dp)
+                                                            .background(appColors.tabActive.copy(alpha = 0.8f))
                                                     )
+                                                }
+                                                // Actual clickable content box
+                                                Box(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(50.dp))
+                                                        .background(
+                                                            if (isSelected) appColors.tabActive.copy(alpha = 0.45f)
+                                                            else Color.Transparent
+                                                        )
+                                                        .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
+                                                        .padding(horizontal = 20.dp, vertical = 7.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Column(
+                                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                                    ) {
+                                                        if (title == "Updates" && updatableModules.isNotEmpty()) {
+                                                            BadgedBox(
+                                                                badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}", fontSize = 9.sp) } }
+                                                            ) {
+                                                                Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                                            }
+                                                        } else {
+                                                            Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                                        }
+                                                        Text(
+                                                            title,
+                                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                            color = iconTint,
+                                                            fontSize = 10.sp,
+                                                            letterSpacing = 0.sp
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
