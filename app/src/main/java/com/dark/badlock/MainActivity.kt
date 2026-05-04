@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -41,6 +42,10 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -912,67 +917,69 @@ fun MainScreen(cacheManager: CacheManager) {
                                             )
                                         )
                                 )
-                                Row(
+                                val selectedIndex = pagerState.currentPage
+
+                                // Outer pill container
+                                Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
                                         .align(Alignment.BottomCenter)
-                                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                                        .padding(horizontal = 24.dp, vertical = 12.dp)
                                         .clip(RoundedCornerShape(50.dp))
                                         .background(appColors.pillBarBg)
-                                        .padding(horizontal = 8.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(4.dp)
                                 ) {
-                                    tabs.forEachIndexed { index, title ->
-                                        val isSelected = pagerState.currentPage == index
-                                        val tabBg by animateColorAsState(
-                                            targetValue = if (isSelected) appColors.tabActive else Color.Transparent,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessMedium
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        tabs.forEachIndexed { index, title ->
+                                            val isSelected = pagerState.currentPage == index
+                                            val iconTint by animateColorAsState(
+                                                targetValue = if (isSelected) appColors.textPrimary else appColors.textSecondary,
+                                                animationSpec = tween(durationMillis = 200)
                                             )
-                                        )
-                                        val iconTint by animateColorAsState(
-                                            targetValue = if (isSelected) appColors.textPrimary else appColors.textSecondary,
-                                            animationSpec = tween(durationMillis = 250)
-                                        )
-                                        val horizontalPad by animateDpAsState(
-                                            targetValue = if (isSelected) 18.dp else 14.dp,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessMedium
-                                            )
-                                        )
-                                        val icon = when (title) {
-                                            "Updates" -> Icons.Default.SystemUpdate
-                                            "Make up" -> Icons.Default.Palette
-                                            else -> Icons.Default.Style
-                                        }
-                                        Row(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(50.dp))
-                                                .background(tabBg)
-                                                .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                                .padding(horizontal = horizontalPad, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Center
-                                        ) {
-                                            if (title == "Updates" && updatableModules.isNotEmpty()) {
-                                                BadgedBox(
-                                                    badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}") } }
-                                                ) {
-                                                    Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
-                                                }
-                                            } else {
-                                                Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                            val icon = when (title) {
+                                                "Updates" -> Icons.Default.SystemUpdate
+                                                "Make up" -> Icons.Default.Palette
+                                                else -> Icons.Default.Style
                                             }
-                                            Spacer(Modifier.width(7.dp))
-                                            Text(
-                                                title,
-                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                                color = if (isSelected) appColors.textPrimary else appColors.textSecondary,
-                                                fontSize = 13.sp
-                                            )
+
+                                            // Each tab item — selected one gets its own pill bg
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(50.dp))
+                                                    .background(
+                                                        if (isSelected) appColors.tabActive
+                                                        else Color.Transparent
+                                                    )
+                                                    .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
+                                                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                ) {
+                                                    if (title == "Updates" && updatableModules.isNotEmpty()) {
+                                                        BadgedBox(
+                                                            badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}", fontSize = 9.sp) } }
+                                                        ) {
+                                                            Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                                        }
+                                                    } else {
+                                                        Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                                    }
+                                                    if (isSelected) {
+                                                        Text(
+                                                            title,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = appColors.textPrimary,
+                                                            fontSize = 13.sp,
+                                                            letterSpacing = 0.sp
+                                                        )
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
