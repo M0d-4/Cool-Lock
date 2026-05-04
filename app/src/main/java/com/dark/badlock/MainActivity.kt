@@ -106,10 +106,10 @@ val DarkAppColors = AppColors(
     iconBox           = Color(0xFF1C1C1C),
     textPrimary       = Color.White.copy(alpha = 0.9f),
     textSecondary     = Color.White.copy(alpha = 0.6f),
-    tabActive         = Color(0xFF1A1A2E),
-    tabBarBackground  = Color(0xFF1A1A1A),
+    tabActive         = Color(0xFF1565C0),
+    tabBarBackground  = Color(0xFF0D2A6E),
     tabBarScrimEnd    = Color.Black,
-    pillBarBg         = Color(0xFF1A1A1A),
+    pillBarBg         = Color(0xFF0D47A1),
     openButtonBg      = Color(0xFF1A1A3A),
     installButtonBg   = Color(0xFF0A1F4E),
     updateButtonBg    = Color(0xFF2A3010),
@@ -129,10 +129,10 @@ val LightAppColors = AppColors(
     iconBox           = Color(0xFFEEEEF4),
     textPrimary       = Color(0xFF1C1C1E),
     textSecondary     = Color(0xFF6C6C70),
-    tabActive         = Color(0xFFDDDDF0),
-    tabBarBackground  = Color(0xFFFFFFFF),
+    tabActive         = Color(0xFF1976D2),
+    tabBarBackground  = Color(0xFF1565C0),
     tabBarScrimEnd    = Color(0xFFF2F2F7),
-    pillBarBg         = Color(0xFFFFFFFF),
+    pillBarBg         = Color(0xFF1565C0),
     openButtonBg      = Color(0xFFDDDDF0),
     installButtonBg   = Color(0xFFD0E0FF),
     updateButtonBg    = Color(0xFFE8F0C8),
@@ -919,13 +919,24 @@ fun MainScreen(cacheManager: CacheManager) {
                                 )
                                 val selectedIndex = pagerState.currentPage
 
-                                // Outer pill container
+                                // Outer pill container — frosted glass effect
+                                // Layer 1: blurred colour bloom (simulates backdrop blur)
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
-                                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                                        .padding(horizontal = 12.dp, vertical = 12.dp)
                                         .clip(RoundedCornerShape(50.dp))
-                                        .background(appColors.pillBarBg)
+                                        .blur(24.dp)
+                                        .background(appColors.pillBarBg.copy(alpha = 0.85f))
+                                        .padding(4.dp)
+                                )
+                                // Layer 2: semi-transparent foreground with content
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                                        .clip(RoundedCornerShape(50.dp))
+                                        .background(appColors.pillBarBg.copy(alpha = 0.35f))
                                         .padding(4.dp)
                                 ) {
                                     Row(
@@ -935,7 +946,7 @@ fun MainScreen(cacheManager: CacheManager) {
                                         tabs.forEachIndexed { index, title ->
                                             val isSelected = pagerState.currentPage == index
                                             val iconTint by animateColorAsState(
-                                                targetValue = if (isSelected) appColors.textPrimary else appColors.textSecondary,
+                                                targetValue = if (isSelected) Color.White else Color.White.copy(alpha = 0.6f),
                                                 animationSpec = tween(durationMillis = 200)
                                             )
                                             val icon = when (title) {
@@ -944,40 +955,37 @@ fun MainScreen(cacheManager: CacheManager) {
                                                 else -> Icons.Default.Style
                                             }
 
-                                            // Each tab item — selected one gets its own pill bg
+                                            // Each tab item — selected one gets blurred pill bg
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(50.dp))
-                                                    .background(
-                                                        if (isSelected) appColors.tabActive
-                                                        else Color.Transparent
-                                                    )
+                                                    .then(if (isSelected) Modifier.blur(16.dp).background(appColors.tabActive.copy(alpha = 0.7f)) else Modifier)
+                                                    .clip(RoundedCornerShape(50.dp))
+                                                    .background(if (isSelected) appColors.tabActive.copy(alpha = 0.4f) else Color.Transparent)
                                                     .clickable { coroutineScope.launch { pagerState.animateScrollToPage(index) } }
-                                                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                                                    .padding(horizontal = 22.dp, vertical = 10.dp),
                                                 contentAlignment = Alignment.Center
                                             ) {
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                Column(
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.spacedBy(3.dp)
                                                 ) {
                                                     if (title == "Updates" && updatableModules.isNotEmpty()) {
                                                         BadgedBox(
                                                             badge = { Badge(containerColor = appColors.badgeBg, contentColor = Color.White) { Text("${updatableModules.size}", fontSize = 9.sp) } }
                                                         ) {
-                                                            Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                                            Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
                                                         }
                                                     } else {
-                                                        Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(20.dp))
+                                                        Icon(icon, contentDescription = title, tint = iconTint, modifier = Modifier.size(22.dp))
                                                     }
-                                                    if (isSelected) {
-                                                        Text(
-                                                            title,
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            color = appColors.textPrimary,
-                                                            fontSize = 13.sp,
-                                                            letterSpacing = 0.sp
-                                                        )
-                                                    }
+                                                    Text(
+                                                        title,
+                                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                        color = iconTint,
+                                                        fontSize = 11.sp,
+                                                        letterSpacing = 0.sp
+                                                    )
                                                 }
                                             }
                                         }
