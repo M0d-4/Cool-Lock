@@ -227,6 +227,10 @@ val LocalMaterialYouSetter = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
 val LocalMaterialYouEnabled = staticCompositionLocalOf { false }
 val LocalSupportsMyou = staticCompositionLocalOf { false }
 
+// Convenience accessor
+val appColors: AppColors
+    @Composable get() = LocalAppColors.current
+
 // Legacy aliases so existing references keep compiling
 val DarkBackground   @Composable get() = LocalAppColors.current.background
 val PrimaryAccent    @Composable get() = LocalAppColors.current.accentPrimary
