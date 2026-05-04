@@ -149,78 +149,83 @@ val LightAppColors = AppColors(
 val LocalAppColors = staticCompositionLocalOf { DarkAppColors }
 val LocalMaterialYou = staticCompositionLocalOf { false }
 
+private const val PREFS_NAME = "cool_lock_prefs"
+private const val KEY_MATERIAL_YOU = "material_you_enabled"
+
+fun getMaterialYouEnabled(context: Context): Boolean =
+    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        .getBoolean(KEY_MATERIAL_YOU, Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+
+fun setMaterialYouEnabled(context: Context, enabled: Boolean) =
+    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        .edit().putBoolean(KEY_MATERIAL_YOU, enabled).apply()
+
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
-    val useMaterialYou by remember {
-        mutableStateOf(
-            android.content.pm.PackageManager.PERMISSION_GRANTED ==
-                context.checkSelfPermission("android.permission.READ_MEDIA_IMAGES") ||
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-        )
+    var materialYouEnabled by remember {
+        mutableStateOf(getMaterialYouEnabled(context))
     }
 
-    // Material You dynamic scheme (Android 12+)
-    val dynamicScheme: ColorScheme? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-    } else null
+    // Expose setter so child composables can toggle it
+    val setMY: (Boolean) -> Unit = { enabled ->
+        materialYouEnabled = enabled
+        setMaterialYouEnabled(context, enabled)
+    }
+
+    val supportsMyou = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    val dynamicScheme: ColorScheme? =
+        if (supportsMyou && materialYouEnabled) {
+            if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        } else null
 
     val colors = if (dynamicScheme != null) {
-        // Derive AppColors from Material You palette
-        if (isDark) DarkAppColors.copy(
-            background        = dynamicScheme.background,
-            surface           = dynamicScheme.surface,
-            cardBackground    = dynamicScheme.surfaceVariant,
-            iconBox           = dynamicScheme.secondaryContainer,
-            tabActive         = dynamicScheme.primaryContainer,
-            tabBarBackground  = dynamicScheme.primary,
-            tabBarScrimEnd    = dynamicScheme.background,
-            pillBarBg         = dynamicScheme.background,
-            openButtonBg      = dynamicScheme.secondaryContainer,
-            installButtonBg   = dynamicScheme.tertiaryContainer,
-            updateButtonBg    = dynamicScheme.primaryContainer,
-            buttonTextColor   = dynamicScheme.onPrimaryContainer,
-            titleBarBackground= dynamicScheme.background,
-            accentPrimary     = dynamicScheme.primary,
-            badgeBg           = dynamicScheme.error,
-            currentVersionText= dynamicScheme.primary,
-            updateLatestText  = dynamicScheme.tertiary
-        ) else LightAppColors.copy(
-            background        = dynamicScheme.background,
-            surface           = dynamicScheme.surface,
-            cardBackground    = dynamicScheme.surfaceVariant,
-            iconBox           = dynamicScheme.secondaryContainer,
-            tabActive         = dynamicScheme.primaryContainer,
-            tabBarBackground  = dynamicScheme.primary,
-            tabBarScrimEnd    = dynamicScheme.background,
-            pillBarBg         = dynamicScheme.background,
-            openButtonBg      = dynamicScheme.secondaryContainer,
-            installButtonBg   = dynamicScheme.tertiaryContainer,
-            updateButtonBg    = dynamicScheme.primaryContainer,
-            buttonTextColor   = dynamicScheme.onPrimaryContainer,
-            titleBarBackground= dynamicScheme.background,
-            accentPrimary     = dynamicScheme.primary,
-            badgeBg           = dynamicScheme.error,
-            currentVersionText= dynamicScheme.primary,
-            updateLatestText  = dynamicScheme.tertiary
+        // Map Material You tokens — use primary/secondary/tertiary containers for vivid wallpaper colours
+        val base = if (isDark) DarkAppColors else LightAppColors
+        base.copy(
+            background         = dynamicScheme.background,
+            surface            = dynamicScheme.surface,
+            cardBackground     = dynamicScheme.surfaceContainer,
+            iconBox            = dynamicScheme.secondaryContainer,
+            textPrimary        = dynamicScheme.onBackground,
+            textSecondary      = dynamicScheme.onSurfaceVariant,
+            tabActive          = dynamicScheme.primaryContainer,
+            tabBarBackground   = dynamicScheme.primary,
+            tabBarScrimEnd     = dynamicScheme.background,
+            pillBarBg          = dynamicScheme.background,
+            openButtonBg       = dynamicScheme.secondaryContainer,
+            installButtonBg    = dynamicScheme.tertiaryContainer,
+            updateButtonBg     = dynamicScheme.primaryContainer,
+            buttonTextColor    = if (isDark) dynamicScheme.onPrimaryContainer else dynamicScheme.onPrimary,
+            titleBarBackground = dynamicScheme.background,
+            accentPrimary      = dynamicScheme.primary,
+            badgeBg            = dynamicScheme.error,
+            currentVersionText = dynamicScheme.primary,
+            updateLatestText   = dynamicScheme.tertiary,
+            websiteIconTint    = dynamicScheme.onSurfaceVariant
         )
     } else {
         if (isDark) DarkAppColors else LightAppColors
     }
 
     val materialScheme = dynamicScheme ?: if (isDark) darkColorScheme() else lightColorScheme()
+
     CompositionLocalProvider(
         LocalAppColors provides colors,
-        LocalMaterialYou provides (dynamicScheme != null)
+        LocalMaterialYou provides (dynamicScheme != null),
+        LocalMaterialYouSetter provides setMY,
+        LocalMaterialYouEnabled provides materialYouEnabled,
+        LocalSupportsMyou provides supportsMyou
     ) {
         MaterialTheme(colorScheme = materialScheme, typography = Typography(), content = content)
     }
 }
 
-// Convenience accessor
-val appColors: AppColors
-    @Composable get() = LocalAppColors.current
+val LocalMaterialYouSetter = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
+val LocalMaterialYouEnabled = staticCompositionLocalOf { false }
+val LocalSupportsMyou = staticCompositionLocalOf { false }
 
 // Legacy aliases so existing references keep compiling
 val DarkBackground   @Composable get() = LocalAppColors.current.background
@@ -934,28 +939,94 @@ fun MainScreen(cacheManager: CacheManager) {
                     val tabs = listOf("Make up", "Life up", "Updates")
                     val pagerState = rememberPagerState(pageCount = { tabs.size })
 
-                    Column {
-                        Box(modifier = Modifier.weight(1f)) {
-                            HorizontalPager(
-                                state = pagerState,
-                                modifier = Modifier.fillMaxSize(),
-                                beyondViewportPageCount = 1
-                            ) { page ->
-                                val pageTitle = tabs[page]
-                                val modulesToShow = when (pageTitle) {
-                                    "Updates" -> updatableModules
-                                    else -> state.modules[pageTitle] ?: emptyList()
-                                }
-                                ModuleList(
-                                    modules = modulesToShow,
-                                    showEmptyMessage = (pageTitle == "Updates"),
-                                    onModuleClick = onModuleClick,
-                                    onWebsiteClick = onWebsiteClick,
-                                    onUpdateClick = onUpdateClick,
-                                    onAppInfoClick = onAppInfoClick,
-                                    onOpenClick = onOpenClick
-                                )
+                    val materialYouEnabled = LocalMaterialYouEnabled.current
+                    val setMaterialYou = LocalMaterialYouSetter.current
+                    val supportsMyou = LocalSupportsMyou.current
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            beyondViewportPageCount = 1
+                        ) { page ->
+                            val pageTitle = tabs[page]
+                            val modulesToShow = when (pageTitle) {
+                                "Updates" -> updatableModules
+                                else -> state.modules[pageTitle] ?: emptyList()
                             }
+                            ModuleList(
+                                modules = modulesToShow,
+                                showEmptyMessage = (pageTitle == "Updates"),
+                                onModuleClick = onModuleClick,
+                                onWebsiteClick = onWebsiteClick,
+                                onUpdateClick = onUpdateClick,
+                                onAppInfoClick = onAppInfoClick,
+                                onOpenClick = onOpenClick
+                            )
+                        }
+
+                        // Top title + Material You toggle
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter)
+                                .background(
+                                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                        colors = listOf(
+                                            appColors.background,
+                                            appColors.background.copy(alpha = 0.9f),
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                .statusBarsPadding(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Cool-Lock",
+                                fontWeight = FontWeight.Bold,
+                                color = appColors.textPrimary,
+                                fontSize = 20.sp
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (supportsMyou) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            "Material You",
+                                            color = appColors.textSecondary,
+                                            fontSize = 12.sp
+                                        )
+                                        Switch(
+                                            checked = materialYouEnabled,
+                                            onCheckedChange = { setMaterialYou(it) },
+                                            modifier = Modifier.height(24.dp),
+                                            colors = SwitchDefaults.colors(
+                                                checkedThumbColor = appColors.accentPrimary,
+                                                checkedTrackColor = appColors.accentPrimary.copy(alpha = 0.4f),
+                                                uncheckedThumbColor = appColors.textSecondary,
+                                                uncheckedTrackColor = appColors.textSecondary.copy(alpha = 0.3f)
+                                            )
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                IconButton(
+                                    onClick = { refreshData(force = true) },
+                                    enabled = moduleState != ModuleState.Loading
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = "Refresh",
+                                        tint = appColors.textSecondary
+                                    )
+                                }
+                            }
+                        }
                             // Gradient scrim + floating pill tab bar
                             Box(
                                 modifier = Modifier
@@ -1073,34 +1144,8 @@ fun MainScreen(cacheManager: CacheManager) {
                             }
                         }
 
-                        // Title + Refresh bar below the pill
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(appColors.titleBarBackground)
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "Cool-Lock",
-                                fontWeight = FontWeight.Bold,
-                                color = appColors.textPrimary,
-                                fontSize = 20.sp
-                            )
-                            IconButton(
-                                onClick = { refreshData(force = true) },
-                                enabled = moduleState != ModuleState.Loading
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Refresh",
-                                    tint = appColors.textSecondary
-                                )
-                            }
-                        }
-                    }
-                }
+                    } // end Box(fillMaxSize)
+                } // end is ModuleState.Success
             }
         }
     }
