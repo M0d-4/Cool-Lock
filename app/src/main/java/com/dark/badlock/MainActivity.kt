@@ -1150,10 +1150,9 @@ fun MainScreen(cacheManager: CacheManager) {
 
                     } // end Box(fillMaxSize)
                 } // end is ModuleState.Success
-            }
-        }
-    }
-}
+            } // end when
+        } // end Scaffold Box
+    } // end Scaffold
 
 @Composable
 fun ModuleList(
