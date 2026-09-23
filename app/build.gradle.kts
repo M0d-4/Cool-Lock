@@ -17,7 +17,7 @@ plugins {
 android {
     // Configure the Android SDK versions for your app.
     namespace = "com.mod4.cool_lock"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.mod4.cool_lock"
