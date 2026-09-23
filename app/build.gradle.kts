@@ -49,10 +49,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     // Enable Jetpack Compose in your project.
     buildFeatures {
         compose = true
@@ -63,6 +59,13 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+}
+
+// Kotlin 2.4+ requires the compilerOptions DSL instead of the old `android { kotlinOptions {} }` block.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
