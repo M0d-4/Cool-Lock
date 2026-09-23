@@ -5,12 +5,11 @@
 
 plugins {
     // Apply the Android Application plugin to enable Android-specific build tasks.
+    // AGP 9+ builds Kotlin support in directly, so the separate kotlin-android plugin
+    // is no longer applied here (see https://kotl.in/gradle/agp-built-in-kotlin).
     id("com.android.application")
 
-    // Apply the Kotlin Android plugin to enable Kotlin features for Android.
-    id("org.jetbrains.kotlin.android")
-
-    // The Compose Compiler Gradle plugin is now required for Kotlin 2.0+
+    // The Compose Compiler Gradle plugin is still required and works with AGP's built-in Kotlin.
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -62,12 +61,12 @@ android {
     }
 }
 
-// Kotlin 2.4+ requires the compilerOptions DSL instead of the old `android { kotlinOptions {} }` block.
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
+// With the kotlin-android plugin removed (AGP 9's built-in Kotlin), the separate
+// `kotlin { compilerOptions {} }` extension it used to provide no longer exists here.
+// android.compileOptions above (Java 17) is what AGP's built-in Kotlin now uses for
+// the Kotlin JVM target too — no extra block needed. If a later error shows this
+// wasn't actually picked up, AGP 9's own DSL for it may need to go directly in
+// android {} instead; paste that error and I'll adjust.
 
 dependencies {
 
