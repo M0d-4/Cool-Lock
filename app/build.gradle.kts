@@ -16,15 +16,15 @@ plugins {
 
 android {
     // Configure the Android SDK versions for your app.
-    namespace = "com.dark.badlock"
-    compileSdk = 35
+    namespace = "com.mod4.cool_lock"
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.dark.badlock"
+        applicationId = "com.mod4.cool_lock"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.8.3"
+        targetSdk = 36
+        versionCode = 200
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -75,10 +75,14 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("com.google.code.gson:gson:2.11.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
+    // FileProvider/ContextCompat come from androidx.core:core-ktx above; no separate core needed
 
     // --- Compose Dependencies ---
     // Core Compose libraries.
-    implementation(platform("androidx.compose:compose-bom:2025.04.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -99,7 +103,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2025.04.01"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.08.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 
     // --- Debugging and Tooling Dependencies ---

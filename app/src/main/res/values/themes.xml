@@ -6,5 +6,5 @@
 -->
 <resources>
     <!-- Base application theme. -->
-    <style name="Theme.Badlock" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.CoolLock" parent="android:Theme.Material.Light.NoActionBar" />
 </resources>
