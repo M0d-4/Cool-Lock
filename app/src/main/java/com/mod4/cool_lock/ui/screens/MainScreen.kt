@@ -53,7 +53,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -75,6 +79,9 @@ import com.mod4.cool_lock.ui.components.ModuleDetailsSheet
 import com.mod4.cool_lock.ui.components.ModuleList
 import com.mod4.cool_lock.ui.components.SearchPill
 import com.mod4.cool_lock.ui.components.ShimmerModuleList
+import com.mod4.cool_lock.ui.components.captureForBackdropBlur
+import com.mod4.cool_lock.ui.components.drawBackdropBlur
+import com.mod4.cool_lock.ui.components.rememberBackdropBlurLayer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -99,6 +106,12 @@ fun MainScreen(viewModel: BadlockViewModel) {
     var searchActive by remember { mutableStateOf(false) }
     var selectedModule by remember { mutableStateOf<InstalledModule?>(null) }
     var overlayHeight by remember { mutableStateOf(0.dp) }
+
+    // Backdrop blur: the content box records itself into blurLayer every frame; the strip
+    // right above the header redraws that recording (blurred + translated into place).
+    val blurLayer = rememberBackdropBlurLayer(radius = 24.dp)
+    var contentOrigin by remember { mutableStateOf(Offset.Zero) }
+    var blurStripOrigin by remember { mutableStateOf(Offset.Zero) }
 
     val pagerState = rememberPagerState(pageCount = { TABS.size })
     val listStates = remember { TABS.map { LazyListState() } }
@@ -278,46 +291,29 @@ fun MainScreen(viewModel: BadlockViewModel) {
     val searching = searchActive && searchQuery.isNotBlank()
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        when (val state = moduleState) {
-            is ModuleState.Loading -> ShimmerModuleList(bottomPadding = listBottomPadding)
-            is ModuleState.Error -> ErrorScreen(
-                errorMessage = state.message,
-                bottomPadding = listBottomPadding,
-                onRetry = { viewModel.refreshData(force = true) }
-            )
-            is ModuleState.Success -> {
-                if (searching) {
-                    // Cross-module search: results come from every tab
-                    ModuleList(
-                        modules = searchResults,
-                        bottomPadding = listBottomPadding,
-                        showEmptyMessage = true,
-                        emptyTitle = "No Results",
-                        emptySubtitle = "No modules match your search.",
-                        emptyIcon = Icons.Default.SearchOff,
-                        onModuleClick = onModuleClick,
-                        onModuleLongClick = { selectedModule = it },
-                        onWebsiteClick = onWebsiteClick,
-                        onUpdateClick = onUpdateClick,
-                        onAppInfoClick = onAppInfoClick,
-                        onOpenClick = onOpenClick
-                    )
-                } else {
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.fillMaxSize(),
-                        beyondViewportPageCount = 1
-                    ) { page ->
-                        val pageTitle = TABS[page]
-                        val modulesToShow = when (pageTitle) {
-                            "Updates" -> updatableModules
-                            else -> state.modules[pageTitle] ?: emptyList()
-                        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { contentOrigin = it.positionInRoot() }
+                .captureForBackdropBlur(blurLayer)
+        ) {
+            when (val state = moduleState) {
+                is ModuleState.Loading -> ShimmerModuleList(bottomPadding = listBottomPadding)
+                is ModuleState.Error -> ErrorScreen(
+                    errorMessage = state.message,
+                    bottomPadding = listBottomPadding,
+                    onRetry = { viewModel.refreshData(force = true) }
+                )
+                is ModuleState.Success -> {
+                    if (searching) {
+                        // Cross-module search: results come from every tab
                         ModuleList(
-                            modules = modulesToShow,
+                            modules = searchResults,
                             bottomPadding = listBottomPadding,
-                            showEmptyMessage = (pageTitle == "Updates"),
-                            listState = listStates[page],
+                            showEmptyMessage = true,
+                            emptyTitle = "No Results",
+                            emptySubtitle = "No modules match your search.",
+                            emptyIcon = Icons.Default.SearchOff,
                             onModuleClick = onModuleClick,
                             onModuleLongClick = { selectedModule = it },
                             onWebsiteClick = onWebsiteClick,
@@ -325,20 +321,48 @@ fun MainScreen(viewModel: BadlockViewModel) {
                             onAppInfoClick = onAppInfoClick,
                             onOpenClick = onOpenClick
                         )
+                    } else {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            beyondViewportPageCount = 1
+                        ) { page ->
+                            val pageTitle = TABS[page]
+                            val modulesToShow = when (pageTitle) {
+                                "Updates" -> updatableModules
+                                else -> state.modules[pageTitle] ?: emptyList()
+                            }
+                            ModuleList(
+                                modules = modulesToShow,
+                                bottomPadding = listBottomPadding,
+                                showEmptyMessage = (pageTitle == "Updates"),
+                                listState = listStates[page],
+                                onModuleClick = onModuleClick,
+                                onModuleLongClick = { selectedModule = it },
+                                onWebsiteClick = onWebsiteClick,
+                                onUpdateClick = onUpdateClick,
+                                onAppInfoClick = onAppInfoClick,
+                                onOpenClick = onOpenClick
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Bottom overlay: [ search pill (separate piece) ] above [ header + island (one docked piece) ]
+        // Bottom overlay: [ search pill (separate piece) ] above [ header + island (one docked piece) ].
+        // NOTE: imePadding() lives on the search pill's AnimatedVisibility only, not on this whole
+        // Column — otherwise the keyboard inset padding grows the Column itself, which (since it's
+        // bottom-aligned) shoves the header/dock up above the keyboard along with the search field.
+        // Keeping it scoped to just the search pill lets the dock stay pinned to the real bottom.
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .imePadding()
                 .onGloballyPositioned { overlayHeight = with(density) { it.size.height.toDp() } }
         ) {
             AnimatedVisibility(
                 visible = searchActive,
+                modifier = Modifier.imePadding(),
                 enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
                         slideInVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) { it },
                 exit = fadeOut() + slideOutVertically { it }
@@ -352,6 +376,28 @@ fun MainScreen(viewModel: BadlockViewModel) {
                     }
                 )
             }
+
+            // Frosted strip: blurs whatever list content is scrolling by right above the header,
+            // so the dock reads as "glass" instead of hard-cutting the list off.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp)
+                    .onGloballyPositioned { blurStripOrigin = it.positionInRoot() }
+                    .drawBackdropBlur(
+                        layer = blurLayer,
+                        sourceTopLeft = { contentOrigin },
+                        targetTopLeft = { blurStripOrigin }
+                    )
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f)
+                            )
+                        )
+                    )
+            )
 
             BottomDock(
                 versionName = versionName,

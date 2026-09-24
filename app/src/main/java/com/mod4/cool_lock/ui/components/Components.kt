@@ -80,25 +80,36 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.graphics.RenderEffect
+import android.graphics.Shader
+import android.os.Build
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -106,6 +117,57 @@ import com.mod4.cool_lock.R
 import com.mod4.cool_lock.data.InstalledModule
 import com.mod4.cool_lock.logic.LaunchHelper
 import com.mod4.cool_lock.logic.UpdateChecker
+
+// ───────────────────────────── Backdrop blur ─────────────────────────────
+
+/**
+ * A [GraphicsLayer] that continuously re-records whatever it's attached to (via
+ * [Modifier.captureForBackdropBlur]) so another composable elsewhere on screen can redraw
+ * that same content, blurred, via [Modifier.drawBackdropBlur]. Real blur only renders on
+ * API 31+ (Android 12); below that the layer just holds an un-blurred copy, so pair it with
+ * a scrim/gradient for a graceful fallback.
+ */
+@Composable
+fun rememberBackdropBlurLayer(radius: Dp = 32.dp): GraphicsLayer {
+    val layer = rememberGraphicsLayer()
+    val density = LocalDensity.current
+    LaunchedEffect(layer, radius) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val radiusPx = with(density) { radius.toPx() }.coerceAtLeast(0.01f)
+            layer.renderEffect = RenderEffect
+                .createBlurEffect(radiusPx, radiusPx, Shader.TileMode.CLAMP)
+                .asComposeRenderEffect()
+            layer.clip = true
+        }
+    }
+    return layer
+}
+
+/** Records this composable's own drawn content into [layer] every frame, in addition to drawing it normally. */
+fun Modifier.captureForBackdropBlur(layer: GraphicsLayer): Modifier = this.drawWithContent {
+    layer.record { this@drawWithContent.drawContent() }
+    drawContent()
+}
+
+/**
+ * Draws [layer] (see [rememberBackdropBlurLayer]) translated so this composable shows exactly
+ * the portion of the captured content that sits behind it — i.e. a "frosted glass" window onto
+ * whatever [Modifier.captureForBackdropBlur] is recording elsewhere. Both [sourceTopLeft] and
+ * [targetTopLeft] must be in the same coordinate space (e.g. both from `positionInRoot()`).
+ */
+fun Modifier.drawBackdropBlur(
+    layer: GraphicsLayer,
+    sourceTopLeft: () -> Offset,
+    targetTopLeft: () -> Offset
+): Modifier = this
+    .clipToBounds()
+    .drawWithContent {
+        val delta = sourceTopLeft() - targetTopLeft()
+        translate(delta.x, delta.y) {
+            drawLayer(layer)
+        }
+        drawContent()
+    }
 
 // ───────────────────────────── Bottom dock ─────────────────────────────
 
@@ -385,8 +447,8 @@ fun ModuleCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(18.dp))
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerLowest),
                 contentAlignment = Alignment.Center
             ) {
@@ -394,7 +456,7 @@ fun ModuleCard(
                     painter = module.iconResId?.let { painterResource(id = it) }
                         ?: painterResource(id = R.mipmap.ic_launcher_foreground),
                     contentDescription = "${module.name} icon",
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(32.dp)
                 )
             }
 
@@ -560,7 +622,7 @@ fun ShimmerModuleItem() {
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(modifier = Modifier.size(52.dp).clip(RoundedCornerShape(18.dp)).shimmerEffect())
+            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).shimmerEffect())
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Box(modifier = Modifier.width(140.dp).height(18.dp).clip(RoundedCornerShape(6.dp)).shimmerEffect())
