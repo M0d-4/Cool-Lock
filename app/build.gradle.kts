@@ -22,7 +22,7 @@ android {
         applicationId = "com.mod4.cool_lock"
         minSdk = 24
         targetSdk = 36
-        versionCode = 200
+        versionCode = 201
         versionName = "2.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
