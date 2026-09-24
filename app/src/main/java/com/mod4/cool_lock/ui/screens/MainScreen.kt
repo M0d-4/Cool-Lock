@@ -20,10 +20,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -53,6 +56,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -105,7 +109,12 @@ fun MainScreen(viewModel: BadlockViewModel) {
 
     var searchActive by remember { mutableStateOf(false) }
     var selectedModule by remember { mutableStateOf<InstalledModule?>(null) }
-    var overlayHeight by remember { mutableStateOf(0.dp) }
+    var dockHeight by remember { mutableStateOf(0.dp) }
+    val imeBottomInset = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    // The search pill floats just above whichever is taller: the header/dock (normal state)
+    // or the keyboard (while typing) — so it never leaves a gap above the dock, and never
+    // gets dragged up past the keyboard.
+    val searchPillBottomPadding = maxOf(dockHeight, imeBottomInset)
 
     // Backdrop blur: the content box records itself into blurLayer every frame; the strip
     // right above the header redraws that recording (blurred + translated into place).
@@ -283,7 +292,7 @@ fun MainScreen(viewModel: BadlockViewModel) {
     val onAppInfoClick: (String) -> Unit = { pkg -> LaunchHelper.openAppInfo(context, pkg) }
     val onOpenClick: (InstalledModule) -> Unit = { module -> LaunchHelper.launchModule(context, module) }
 
-    val listBottomPadding: Dp = overlayHeight + 16.dp
+    val listBottomPadding: Dp = dockHeight + 16.dp
     val successState = moduleState as? ModuleState.Success
     val updatableModules = remember(successState) {
         successState?.modules?.values?.flatten()?.filter { it.isUpdateAvailable } ?: emptyList()
@@ -350,74 +359,79 @@ fun MainScreen(viewModel: BadlockViewModel) {
             }
         }
 
-        // Bottom overlay: [ search pill (separate piece) ] above [ header + island (one docked piece) ].
-        // NOTE: imePadding() lives on the search pill's AnimatedVisibility only, not on this whole
-        // Column — otherwise the keyboard inset padding grows the Column itself, which (since it's
-        // bottom-aligned) shoves the header/dock up above the keyboard along with the search field.
-        // Keeping it scoped to just the search pill lets the dock stay pinned to the real bottom.
-        Column(
+        // Soft shadow that hugs the header's rounded top edge — a blurred, darkened echo of the
+        // list content curving up into the dock's own corner radius, rather than a hard-edged
+        // strip. Drawn BEFORE the dock so the dock's own rounded top paints over (and hides) the
+        // portion of the shadow that tucks underneath it.
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .onGloballyPositioned { overlayHeight = with(density) { it.size.height.toDp() } }
-        ) {
-            AnimatedVisibility(
-                visible = searchActive,
-                modifier = Modifier.imePadding(),
-                enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-                        slideInVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) { it },
-                exit = fadeOut() + slideOutVertically { it }
-            ) {
-                SearchPill(
-                    query = searchQuery,
-                    onQueryChange = { viewModel.updateSearchQuery(it) },
-                    onClose = {
-                        searchActive = false
-                        viewModel.updateSearchQuery("")
-                    }
+                .padding(bottom = (dockHeight - 14.dp).coerceAtLeast(0.dp))
+                .fillMaxWidth()
+                .height(36.dp)
+                .clip(RoundedCornerShape(topStart = 44.dp, topEnd = 44.dp))
+                .onGloballyPositioned { blurStripOrigin = it.positionInRoot() }
+                .drawBackdropBlur(
+                    layer = blurLayer,
+                    sourceTopLeft = { contentOrigin },
+                    targetTopLeft = { blurStripOrigin }
                 )
-            }
-
-            // Frosted strip: blurs whatever list content is scrolling by right above the header,
-            // so the dock reads as "glass" instead of hard-cutting the list off.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(28.dp)
-                    .onGloballyPositioned { blurStripOrigin = it.positionInRoot() }
-                    .drawBackdropBlur(
-                        layer = blurLayer,
-                        sourceTopLeft = { contentOrigin },
-                        targetTopLeft = { blurStripOrigin }
-                    )
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f)
-                            )
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.10f),
+                            Color.Black.copy(alpha = 0.30f)
                         )
                     )
-            )
+                )
+        )
 
-            BottomDock(
-                versionName = versionName,
-                tabs = TABS,
-                currentPage = pagerState.currentPage,
-                updatableCount = updatableModules.size,
-                searchActive = searchActive,
-                refreshEnabled = moduleState != ModuleState.Loading,
-                onSearchClick = {
-                    if (searchActive) viewModel.updateSearchQuery("")
-                    searchActive = !searchActive
-                },
-                onRefresh = { viewModel.refreshData(force = true) },
-                onTabClick = { index ->
-                    // Leaving search when a tab is chosen
-                    if (searchActive) {
-                        searchActive = false
-                        viewModel.updateSearchQuery("")
-                    }
-                    coroutineScope.launch { pagerState.animateScrollToPage(index) }
+        // Header + dock: pinned to the real bottom of the screen, always — no ime-awareness
+        // here at all, so the keyboard can never drag it up.
+        BottomDock(
+            versionName = versionName,
+            tabs = TABS,
+            currentPage = pagerState.currentPage,
+            updatableCount = updatableModules.size,
+            searchActive = searchActive,
+            refreshEnabled = moduleState != ModuleState.Loading,
+            onSearchClick = {
+                if (searchActive) viewModel.updateSearchQuery("")
+                searchActive = !searchActive
+            },
+            onRefresh = { viewModel.refreshData(force = true) },
+            onTabClick = { index ->
+                // Leaving search when a tab is chosen
+                if (searchActive) {
+                    searchActive = false
+                    viewModel.updateSearchQuery("")
+                }
+                coroutineScope.launch { pagerState.animateScrollToPage(index) }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .onGloballyPositioned { dockHeight = with(density) { it.size.height.toDp() } }
+        )
+
+        // Search pill: floats just above whichever is taller right now — the dock (idle) or the
+        // keyboard (typing) — via searchPillBottomPadding, so it never leaves a gap above the dock
+        // and never gets pulled up past the keyboard.
+        AnimatedVisibility(
+            visible = searchActive,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = searchPillBottomPadding),
+            enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+                    slideInVertically(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)) { it },
+            exit = fadeOut() + slideOutVertically { it }
+        ) {
+            SearchPill(
+                query = searchQuery,
+                onQueryChange = { viewModel.updateSearchQuery(it) },
+                onClose = {
+                    searchActive = false
+                    viewModel.updateSearchQuery("")
                 }
             )
         }
